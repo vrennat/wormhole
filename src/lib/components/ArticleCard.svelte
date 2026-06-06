@@ -35,6 +35,15 @@
 	let htmlError = $state(false);
 	let contentEl = $state<HTMLElement | null>(null);
 
+	// Tapping anywhere on a collapsed card (except its buttons/links) opens the reader.
+	function handleCardTap(event: MouseEvent) {
+		if (expanded) return;
+		const el = event.target as HTMLElement | null;
+		if (el?.closest('button, a')) return; // let controls handle their own clicks
+		if (window.getSelection()?.toString()) return; // don't hijack text selection
+		toggleRead();
+	}
+
 	async function toggleRead() {
 		if (expanded) {
 			expanded = false;
@@ -131,11 +140,14 @@
 	});
 </script>
 
-<article
+<!-- Tap-to-open is a convenience; the keyboard-accessible path is the "Read article" button. -->
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div
 	bind:this={el}
-	class="animate-rise overflow-hidden rounded-[var(--radius-card)] border border-hair
+	onclick={handleCardTap}
+	class="animate-rise block overflow-hidden rounded-[var(--radius-card)] border border-hair
 		bg-surface/80 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-sm
-		transition-colors hover:border-hair-strong"
+		transition-colors hover:border-hair-strong {expanded ? '' : 'cursor-pointer'}"
 >
 	{#if article.thumbnail}
 		<div class="relative aspect-[16/10] w-full overflow-hidden bg-surface-2">
@@ -297,4 +309,4 @@
 			</div>
 		{/if}
 	</div>
-</article>
+</div>
