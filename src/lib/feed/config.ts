@@ -12,6 +12,14 @@ export const FEED = {
 	relevanceWeight: 2.5,
 	/** Bonus for candidates that have a lead image (richer cards). */
 	imageBonus: 0.6,
+	/**
+	 * Prominence boost for links that appear early in the source article (the lead
+	 * section). This is what makes the feed feel like exploring an article's actual
+	 * connections rather than a random/alphabetical slice of its outbound links.
+	 */
+	positionWeight: 2.4,
+	/** Decay constant for the position boost (links ~this far in get ~37% of it). */
+	positionHalfLife: 10,
 	/** Per-token penalty for overlapping with recently shown articles (variety). */
 	varietyPenalty: -0.45,
 	/** Nudge against `related` fallbacks so genuine outbound links win ties. */

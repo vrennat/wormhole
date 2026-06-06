@@ -12,6 +12,7 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
 		isDisambiguation: false,
 		relation: 'link',
 		categories: [],
+		position: 0,
 		...overrides
 	};
 }
@@ -74,6 +75,12 @@ describe('scoreCandidate', () => {
 			const link = scoreCandidate(candidate({ relation: 'link' }), context());
 			const related = scoreCandidate(candidate({ relation: 'related' }), context());
 			expect(link).toBeGreaterThan(related);
+		});
+
+		it('prefers prominent (earlier-in-article) links', () => {
+			const lead = scoreCandidate(candidate({ position: 0 }), context());
+			const deep = scoreCandidate(candidate({ position: 40 }), context());
+			expect(lead).toBeGreaterThan(deep);
 		});
 	});
 

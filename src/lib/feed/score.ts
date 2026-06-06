@@ -30,6 +30,11 @@ export function scoreCandidate(candidate: Candidate, ctx: EngineContext): number
 	if (candidate.thumbnail) score += FEED.imageBonus;
 	if (candidate.relation === 'related') score += FEED.relatedPenalty;
 
+	// Prominence: links earlier in the article (lead section) are the real rabbit-hole
+	// connections. Exponential decay so the first handful get a strong, tapering boost.
+	const position = candidate.position ?? FEED.positionHalfLife;
+	score += FEED.positionWeight * Math.exp(-position / FEED.positionHalfLife);
+
 	// Dampen politics, matching title + description + (when present) categories.
 	const categories = candidate.categories ?? [];
 	const blob = `${candidate.title} ${candidate.description ?? ''} ${categories.join(' ')}`;

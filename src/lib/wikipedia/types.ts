@@ -43,6 +43,12 @@ export interface Candidate {
 	 * feed engine also leans on title/description for topic signals like politics.
 	 */
 	categories: string[];
+	/**
+	 * Position of this link in the source article's reading order (0 = first, most
+	 * prominent — i.e. lead-section links). Lower is more "rabbit-hole-worthy"; the
+	 * engine boosts earlier links so the feed follows what the article is about.
+	 */
+	position: number;
 }
 
 export interface SearchResult {
