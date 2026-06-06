@@ -11,6 +11,7 @@ interface ActionPage {
 	description?: string;
 	thumbnail?: Thumbnail;
 	pageprops?: { disambiguation?: string };
+	categories?: { ns: number; title: string }[];
 }
 
 interface QueryResponse {
@@ -28,7 +29,8 @@ function toCandidate(p: ActionPage, relation: 'link' | 'related'): Candidate {
 		description: p.description ?? null,
 		thumbnail: p.thumbnail ?? null,
 		isDisambiguation: p.pageprops?.disambiguation !== undefined,
-		relation
+		relation,
+		categories: (p.categories ?? []).map((c) => c.title)
 	};
 }
 
@@ -49,10 +51,12 @@ export async function fetchOutboundLinks(title: string): Promise<Candidate[]> {
 		titles: title,
 		gpllimit: '500',
 		gplnamespace: '0',
-		prop: 'pageimages|description|pageprops',
+		prop: 'pageimages|description|pageprops|categories',
 		piprop: 'thumbnail',
 		pithumbsize: '480',
 		ppprop: 'disambiguation',
+		clshow: '!hidden',
+		cllimit: 'max',
 		redirects: '1'
 	});
 	return refine(data.query?.pages ?? [], 'link');
@@ -66,10 +70,12 @@ export async function fetchRelated(title: string): Promise<Candidate[]> {
 		gsrsearch: `morelike:${title}`,
 		gsrnamespace: '0',
 		gsrlimit: '20',
-		prop: 'pageimages|description|pageprops',
+		prop: 'pageimages|description|pageprops|categories',
 		piprop: 'thumbnail',
 		pithumbsize: '480',
-		ppprop: 'disambiguation'
+		ppprop: 'disambiguation',
+		clshow: '!hidden',
+		cllimit: 'max'
 	});
 	return refine(data.query?.pages ?? [], 'related');
 }

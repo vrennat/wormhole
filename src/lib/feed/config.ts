@@ -18,6 +18,12 @@ export const FEED = {
 	relatedPenalty: -0.25,
 	/** Safety net — disambiguation pages should already be filtered out. */
 	disambiguationPenalty: -5,
+	/**
+	 * Heavy dampening for political content (elections/presidents/parties/etc.).
+	 * Large enough to sink political candidates below everything else, but additive
+	 * (not -Infinity), so they can still appear when nothing else is available.
+	 */
+	politicalPenalty: -500,
 	/** Probability of ignoring relevance and jumping somewhere loosely connected. */
 	surpriseEpsilon: 0.18,
 	/** Pick the next step by weighted-random among the top-K scorers (not pure argmax). */

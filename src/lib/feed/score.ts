@@ -1,6 +1,7 @@
 import type { Candidate } from '$lib/wikipedia/types';
 import type { EngineContext } from './types';
 import { FEED } from './config';
+import { isPolitical } from './politics';
 import { tokenize } from './tokens';
 
 /**
@@ -28,6 +29,11 @@ export function scoreCandidate(candidate: Candidate, ctx: EngineContext): number
 	score += overlap * FEED.varietyPenalty;
 	if (candidate.thumbnail) score += FEED.imageBonus;
 	if (candidate.relation === 'related') score += FEED.relatedPenalty;
+
+	// Dampen politics, matching title + description + (when present) categories.
+	const categories = candidate.categories ?? [];
+	const blob = `${candidate.title} ${candidate.description ?? ''} ${categories.join(' ')}`;
+	if (isPolitical(blob)) score += FEED.politicalPenalty;
 
 	return score;
 }

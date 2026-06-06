@@ -37,6 +37,12 @@ export interface Candidate {
 	thumbnail: Thumbnail | null;
 	isDisambiguation: boolean;
 	relation: 'link' | 'related';
+	/**
+	 * Visible (non-hidden) category titles, when available. The Action API's
+	 * category budget truncates on link-heavy pages, so this is best-effort — the
+	 * feed engine also leans on title/description for topic signals like politics.
+	 */
+	categories: string[];
 }
 
 export interface SearchResult {

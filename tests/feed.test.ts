@@ -11,6 +11,7 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
 		thumbnail: { source: 'x', width: 1, height: 1 },
 		isDisambiguation: false,
 		relation: 'link',
+		categories: [],
 		...overrides
 	};
 }
@@ -73,6 +74,37 @@ describe('scoreCandidate', () => {
 			const link = scoreCandidate(candidate({ relation: 'link' }), context());
 			const related = scoreCandidate(candidate({ relation: 'related' }), context());
 			expect(link).toBeGreaterThan(related);
+		});
+	});
+
+	describe('political dampening', () => {
+		it('sinks political candidates far below neutral ones', () => {
+			const neutral = scoreCandidate(candidate({ title: 'Volcano', description: 'mountain' }), context());
+			const political = scoreCandidate(
+				candidate({ title: '2020 United States presidential election', description: 'US election' }),
+				context()
+			);
+			expect(political).toBeLessThan(neutral - 100);
+		});
+
+		it('detects politics from categories when title/description look neutral', () => {
+			const c = candidate({
+				title: 'John Q. Public',
+				description: 'American lawyer',
+				categories: ['Category:United States senators from Ohio']
+			});
+			expect(scoreCandidate(c, context())).toBeLessThan(0);
+		});
+
+		it('does not dampen apolitical articles', () => {
+			expect(scoreCandidate(candidate({ title: 'Octopus', description: 'mollusc' }), context()))
+				.toBeGreaterThan(0);
+		});
+
+		it('keeps political candidates eligible (soft penalty, not a block)', () => {
+			// Even heavily penalized, a political candidate is still selectable if it's all there is.
+			const pool = [candidate({ title: 'United States Congress', description: 'legislature' })];
+			expect(selectNext(pool, context({ rng: seq([0.99, 0]) }))).not.toBeNull();
 		});
 	});
 });
