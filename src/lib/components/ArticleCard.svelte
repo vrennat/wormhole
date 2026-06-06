@@ -26,9 +26,44 @@
 		}
 	}
 
-	function openFull() {
+	// Inline full-article reading: fetch sanitized HTML on first expand, then toggle.
+	let expanded = $state(false);
+	let articleHtml = $state<string | null>(null);
+	let htmlLoading = $state(false);
+	let htmlError = $state(false);
+	let contentEl = $state<HTMLElement | null>(null);
+
+	async function toggleRead() {
+		if (expanded) {
+			expanded = false;
+			return;
+		}
+		expanded = true;
 		profile.recordClickthrough(article.title);
+		if (articleHtml || htmlLoading) return;
+
+		htmlLoading = true;
+		htmlError = false;
+		try {
+			const res = await fetch(`/api/article?title=${encodeURIComponent(article.title)}`);
+			const data = (await res.json()) as { html: string | null };
+			if (data.html) articleHtml = data.html;
+			else htmlError = true;
+		} catch {
+			htmlError = true;
+		} finally {
+			htmlLoading = false;
+		}
 	}
+
+	// Make links inside the rendered article open on Wikipedia in a new tab.
+	$effect(() => {
+		if (!contentEl || !articleHtml) return;
+		for (const a of contentEl.querySelectorAll('a')) {
+			a.setAttribute('target', '_blank');
+			a.setAttribute('rel', 'noopener noreferrer');
+		}
+	});
 
 	// Dwell tracking: accumulate time this card is at least half on screen.
 	let el = $state<HTMLElement | null>(null);
@@ -157,17 +192,19 @@
 				More like this
 			</button>
 
-			<a
-				href={article.wikiUrl}
-				target="_blank"
-				rel="noopener noreferrer"
-				onclick={openFull}
+			<button
+				type="button"
+				onclick={toggleRead}
+				aria-expanded={expanded}
 				class="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm
-					font-medium text-faint transition-colors hover:text-ink"
+					font-medium transition-colors {expanded
+					? 'text-accent'
+					: 'text-faint hover:text-ink'}"
 			>
-				Read full
+				{expanded ? 'Collapse' : 'Read article'}
 				<svg
-					class="size-3.5"
+					class="size-3.5 transition-transform {expanded ? 'rotate-180' : ''}
+						{htmlLoading ? 'animate-spin' : ''}"
 					viewBox="0 0 24 24"
 					fill="none"
 					stroke="currentColor"
@@ -176,9 +213,55 @@
 					stroke-linejoin="round"
 					aria-hidden="true"
 				>
-					<path d="M7 17 17 7M9 7h8v8" />
+					{#if htmlLoading}
+						<path d="M21 12a9 9 0 1 1-6.2-8.6" />
+					{:else}
+						<path d="m6 9 6 6 6-6" />
+					{/if}
 				</svg>
-			</a>
+			</button>
 		</div>
+
+		{#if expanded}
+			<div class="mt-2 border-t border-hair pt-4">
+				{#if htmlLoading}
+					<div class="space-y-2.5" aria-hidden="true">
+						<div class="h-3 w-full animate-pulse rounded-full bg-surface-2"></div>
+						<div class="h-3 w-11/12 animate-pulse rounded-full bg-surface-2"></div>
+						<div class="h-3 w-full animate-pulse rounded-full bg-surface-2"></div>
+						<div class="h-3 w-4/5 animate-pulse rounded-full bg-surface-2"></div>
+					</div>
+				{:else if htmlError}
+					<p class="text-sm text-faint">
+						Couldn't load the article inline.
+						<a
+							href={article.wikiUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-accent hover:underline">Open on Wikipedia instead ↗</a
+						>
+					</p>
+				{:else if articleHtml}
+					<div class="max-h-[75vh] overflow-y-auto pr-1">
+						<!-- Sanitized server-side (scripts/handlers stripped); see wikipedia/article.ts -->
+						<div bind:this={contentEl} class="wiki-content">{@html articleHtml}</div>
+					</div>
+					<div class="mt-4 flex items-center justify-between border-t border-hair pt-3">
+						<a
+							href={article.wikiUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-xs font-medium text-faint transition-colors hover:text-ink"
+							>Open on Wikipedia ↗</a
+						>
+						<button
+							type="button"
+							onclick={toggleRead}
+							class="text-xs font-medium text-accent hover:underline">Collapse</button
+						>
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 </article>

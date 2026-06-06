@@ -44,6 +44,14 @@ export async function restGet<T>(path: string): Promise<T | null> {
 	return (await res.json()) as T;
 }
 
+/** GET a REST v1 endpoint that returns HTML/text (e.g. `page/html/...`). Null on 404. */
+export async function restGetText(path: string): Promise<string | null> {
+	const res = await fetch(`${REST_BASE}/${path}`, { headers: HEADERS });
+	if (res.status === 404) return null;
+	if (!res.ok) throw new WikiError(`REST ${path} failed`, res.status);
+	return await res.text();
+}
+
 /** GET the Action API with the given query params (format=json is added for you). */
 export async function actionGet<T>(params: Record<string, string>): Promise<T> {
 	const qs = new URLSearchParams({ format: 'json', formatversion: '2', ...params });
