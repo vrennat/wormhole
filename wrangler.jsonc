@@ -2,8 +2,9 @@
 	// Cloudflare Workers config for `wrangler deploy` (later — develop locally with `npm run dev`).
 	// Paths/bindings follow @sveltejs/adapter-cloudflare v7 (Workers + static assets).
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "wormhole",
+	"name": "tangent",
 	"main": ".svelte-kit/cloudflare/_worker.js",
+	"routes": [{ "pattern": "tangent.page", "custom_domain": true }],
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {

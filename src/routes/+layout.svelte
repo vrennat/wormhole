@@ -16,7 +16,7 @@
 		class="sticky top-0 z-20 -mx-4 flex items-center justify-between border-b border-hair/60
 			bg-void/70 px-4 py-3 backdrop-blur-md"
 	>
-		<a href="/" class="transition-opacity hover:opacity-80" aria-label="Wormhole home">
+		<a href="/" class="transition-opacity hover:opacity-80" aria-label="Tangent home">
 			<BrandMark />
 		</a>
 
@@ -72,7 +72,7 @@
 				>
 					<path d="M12 5v14M5 12h14" />
 				</svg>
-				New wormhole
+				New tangent
 			</a>
 		</div>
 	</header>

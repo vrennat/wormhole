@@ -18,5 +18,5 @@
 		</g>
 		<circle cx="16" cy="16" r="2.2" fill="#8b7bff" />
 	</svg>
-	<span class="text-ink">wormhole</span>
+	<span class="text-ink">tangent</span>
 </span>

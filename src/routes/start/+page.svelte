@@ -58,7 +58,7 @@
 </script>
 
 <svelte:head>
-	<title>Start a rabbit hole · Wormhole</title>
+	<title>Start a rabbit hole · Tangent</title>
 </svelte:head>
 
 <div class="flex flex-col items-center pt-8 pb-16 text-center">
@@ -67,7 +67,7 @@
 		Fall down a rabbit hole
 	</h1>
 	<p class="mt-3 max-w-md text-[15px] leading-relaxed text-muted">
-		Pick a starting point. Wormhole follows the links from one Wikipedia article to the next —
+		Pick a starting point. Tangent follows the links from one Wikipedia article to the next —
 		and shows you exactly how you got there.
 	</p>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { Article } from '$lib/wikipedia/types';
-	import { wormholeTitleFromHref } from '$lib/wikipedia/links';
+	import { articleTitleFromHref } from '$lib/wikipedia/links';
 
 	let {
 		article,
@@ -47,7 +47,7 @@
 	});
 
 	// Rewire article links once the HTML renders.
-	// - Wikipedia article links become wormhole dives (left-click) or new-tab wormholes (cmd/middle).
+	// - Wikipedia article links become dives (left-click) or new-tab tangents (cmd/middle).
 	// - Everything else opens on Wikipedia in a new tab.
 	$effect(() => {
 		if (!contentEl || !articleHtml) return;
@@ -56,9 +56,9 @@
 			const href = a.getAttribute('href') ?? '';
 			if (href.startsWith('#')) continue;
 
-			const title = wormholeTitleFromHref(href);
+			const title = articleTitleFromHref(href);
 			if (title) {
-				// Real URL preserves middle/cmd-click behavior (new wormhole in new tab).
+				// Real URL preserves middle/cmd-click behavior (new tangent in new tab).
 				a.setAttribute('href', `/?seed=${encodeURIComponent(title)}`);
 				a.dataset.seed = title;
 				a.classList.add('wh-dive');

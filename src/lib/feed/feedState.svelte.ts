@@ -45,7 +45,7 @@ async function fetchLinksApi(from: string, mode?: 'related'): Promise<FetchResul
  * prefetched cards so scrolling stays smooth.
  *
  * The trail (titles + relations) is persisted to sessionStorage so refresh and
- * back-navigation restore the wormhole without destroying context.
+ * back-navigation restore the feed without destroying context.
  */
 class FeedState {
 	cards = $state<FeedCard[]>([]);
@@ -306,7 +306,7 @@ class FeedState {
 			const cardResult = await fetchCardApi(selection.candidate.title);
 			if (cardResult.ok) {
 				const relation: Relation = selection.surprised ? 'surprise' : selection.candidate.relation;
-				// Surprise: breadcrumb says "Wormhole jump from <actual previous card>", not the tip.
+				// Surprise: breadcrumb says "Tangent from <actual previous card>", not the tip.
 				const rawTip = this.#buffer.at(-1) ?? this.cards.at(-1);
 				const fromTitle = selection.surprised
 					? (rawTip?.article.title ?? tip.article.title)

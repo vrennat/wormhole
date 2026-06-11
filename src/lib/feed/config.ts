@@ -63,11 +63,11 @@ export const FEED = {
 	 */
 	surpriseMinPool: 3,
 	/** sessionStorage key used to persist the trail (titles + relations only — tiny). */
-	trailStorageKey: 'wormhole:trail:v1',
+	trailStorageKey: 'tangent:trail:v1',
 	/** Maximum trail nodes stored; older entries are dropped from the tail. */
 	trailCap: 100,
 	/** How many of the stored trail's latest nodes we refetch on rehydration (cold-cache budget). */
 	rehydrateRestoreCap: 20,
 	/** sessionStorage sentinel that gates decay to once per tab session. */
-	decayStorageKey: 'wormhole:decay:v1'
+	decayStorageKey: 'tangent:decay:v1'
 } as const;

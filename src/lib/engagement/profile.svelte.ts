@@ -4,7 +4,7 @@ import { FEED } from '$lib/feed/config';
 import { tokenize } from '$lib/feed/tokens';
 import { applySessionDecay } from './decay';
 
-const STORAGE_KEY = 'wormhole:profile:v1';
+const STORAGE_KEY = 'tangent:profile:v1';
 
 interface Persisted {
 	likedTitles: string[];

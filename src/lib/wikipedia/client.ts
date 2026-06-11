@@ -8,7 +8,7 @@
 const REST_BASE = 'https://en.wikipedia.org/api/rest_v1';
 const ACTION_BASE = 'https://en.wikipedia.org/w/api.php';
 
-const USER_AGENT = 'Wormhole/0.1 (https://github.com/tanner/wormhole; tannervass@gmail.com)';
+const USER_AGENT = 'Tangent/0.1 (https://tangent.page; tannervass@gmail.com)';
 
 const HEADERS = {
 	'User-Agent': USER_AGENT,

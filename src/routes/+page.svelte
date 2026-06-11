@@ -15,8 +15,8 @@
 
 	// Rehydrate an existing session or start fresh. Runs on mount and whenever
 	// seedParam changes. rehydrate() returns false when no matching trail exists,
-	// in which case start() kicks off a fresh wormhole. The cancelled flag stops a
-	// superseded run from starting the wormhole it was navigated away from.
+	// in which case start() kicks off a fresh feed. The cancelled flag stops a
+	// superseded run from starting the feed it was navigated away from.
 	$effect(() => {
 		const seed = seedParam;
 		let cancelled = false;
@@ -140,7 +140,7 @@
 </script>
 
 <svelte:head>
-	<title>{feed.seedTitle ? `${feed.seedTitle} · Wormhole` : 'Wormhole'}</title>
+	<title>{feed.seedTitle ? `${feed.seedTitle} · Tangent` : 'Tangent'}</title>
 </svelte:head>
 
 {#if readerCard}
@@ -171,7 +171,7 @@
 	</div>
 {:else if feed.cards.length === 0}
 	<div class="space-y-5">
-		<p class="text-center text-sm text-faint">Opening a wormhole…</p>
+		<p class="text-center text-sm text-faint">Going off on a tangent…</p>
 		<SkeletonCard />
 		<SkeletonCard />
 	</div>
@@ -227,7 +227,7 @@
 			</div>
 		{:else if feed.isExhausted}
 			<div class="flex flex-col items-center gap-4 text-center">
-				<p class="text-sm text-muted">This wormhole has collapsed — no more links to follow.</p>
+				<p class="text-sm text-muted">This tangent has run dry — no more links to follow.</p>
 				{#if !feed.showStartOver}
 					<button
 						type="button"
@@ -242,7 +242,7 @@
 				<a
 					href="/start"
 					class="rounded-full border border-hair px-4 py-2 text-sm font-medium text-muted
-						transition-colors hover:border-accent/50 hover:text-accent">Start a new wormhole</a
+						transition-colors hover:border-accent/50 hover:text-accent">Start a new tangent</a
 				>
 			</div>
 		{:else}

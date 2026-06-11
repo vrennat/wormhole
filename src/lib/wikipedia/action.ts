@@ -1,6 +1,6 @@
 import type { Candidate, SearchResult, Thumbnail } from './types';
 import { actionGet } from './client';
-import { wormholeTitleFromHref } from './links';
+import { articleTitleFromHref } from './links';
 
 /** A page object as returned by the Action API with formatversion=2. */
 interface ActionPage {
@@ -90,7 +90,7 @@ async function fetchLeadLinkTitles(title: string): Promise<string[]> {
 		const anchor = /<a\b[^>]*?\shref="([^"]+)"/g;
 		let match: RegExpExecArray | null;
 		while ((match = anchor.exec(fragment)) !== null) {
-			const linked = wormholeTitleFromHref(match[1]);
+			const linked = articleTitleFromHref(match[1]);
 			if (!linked || linked === title || /\(disambiguation\)$/i.test(linked)) continue;
 			if (!seen.has(linked)) {
 				seen.add(linked);

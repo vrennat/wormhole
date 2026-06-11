@@ -1,8 +1,9 @@
-# wormhole
+# tangent
 
-A Wikipedia rabbit hole feed. Scroll a feed of article cards where each one shows
-**why** it connects to the last — "linked from", "related to", or a "wormhole jump".
-The connective tissue between articles is the whole point.
+A Wikipedia rabbit hole feed, live at [tangent.page](https://tangent.page). Scroll a
+feed of article cards where each one shows **why** it connects to the last — "linked
+from", "related to", or a surprise "tangent". The connective tissue between articles
+is the whole point.
 
 No bundled dataset: articles are fetched live from the Wikipedia API and cached hard,
 so there's nothing to download and the feed stays current.

@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /*
- * Wormhole design tokens. Dark-first, "Arc browser meets Twitter".
+ * Tangent design tokens. Dark-first, "Arc browser meets Twitter".
  * Defining colors in @theme generates the utilities (bg-void, text-ink, border-hair, ...).
  */
 @theme {
@@ -120,7 +120,7 @@ body {
 .wiki-content a:hover {
 	text-decoration: underline;
 }
-/* Article links dive into a new wormhole; external links leave to the web. */
+/* Article links dive deeper in the feed; external links leave to the web. */
 .wiki-content a.wh-dive {
 	cursor: pointer;
 	text-decoration-color: color-mix(in oklab, var(--color-accent) 45%, transparent);
