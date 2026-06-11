@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import type { FeedCard } from '$lib/feed/types';
 	import { profile } from '$lib/engagement/profile.svelte';
-	import { wormholeTitleFromHref } from '$lib/wikipedia/links';
 	import ConnectionBreadcrumb from './ConnectionBreadcrumb.svelte';
 
 	let {
 		card,
-		onBranch
+		onBranch,
+		onRead
 	}: {
 		card: FeedCard;
 		onBranch: (card: FeedCard) => Promise<void> | void;
+		onRead: (card: FeedCard) => void;
 	} = $props();
 
 	const article = $derived(card.article);
@@ -28,84 +28,18 @@
 		}
 	}
 
-	// Inline full-article reading: fetch sanitized HTML on first expand, then toggle.
-	let expanded = $state(false);
-	let articleHtml = $state<string | null>(null);
-	let htmlLoading = $state(false);
-	let htmlError = $state(false);
-	let contentEl = $state<HTMLElement | null>(null);
+	function read() {
+		profile.recordClickthrough(article);
+		onRead(card);
+	}
 
-	// Tapping anywhere on a collapsed card (except its buttons/links) opens the reader.
+	// Tapping anywhere on the card (except buttons/links) opens the reader.
 	function handleCardTap(event: MouseEvent) {
-		if (expanded) return;
 		const el = event.target as HTMLElement | null;
-		if (el?.closest('button, a')) return; // let controls handle their own clicks
-		if (window.getSelection()?.toString()) return; // don't hijack text selection
-		toggleRead();
+		if (el?.closest('button, a')) return;
+		if (window.getSelection()?.toString()) return;
+		read();
 	}
-
-	async function toggleRead() {
-		if (expanded) {
-			expanded = false;
-			return;
-		}
-		expanded = true;
-		profile.recordClickthrough(article.title);
-		if (articleHtml || htmlLoading) return;
-
-		htmlLoading = true;
-		htmlError = false;
-		try {
-			const res = await fetch(`/api/article?title=${encodeURIComponent(article.title)}`);
-			const data = (await res.json()) as { html: string | null };
-			if (data.html) articleHtml = data.html;
-			else htmlError = true;
-		} catch {
-			htmlError = true;
-		} finally {
-			htmlLoading = false;
-		}
-	}
-
-	// Rewire links inside the rendered article:
-	//  - article links  -> open a new wormhole from that topic (client-side nav)
-	//  - everything else -> open on Wikipedia in a new tab
-	//  - in-page #anchors -> left alone (scroll to footnotes/sections within the card)
-	$effect(() => {
-		if (!contentEl || !articleHtml) return;
-
-		for (const a of contentEl.querySelectorAll('a')) {
-			const href = a.getAttribute('href') ?? '';
-			if (href.startsWith('#')) continue;
-
-			const title = wormholeTitleFromHref(href);
-			if (title) {
-				// Real URL so middle/cmd-click opens the new wormhole in a new tab too.
-				a.setAttribute('href', `/?seed=${encodeURIComponent(title)}`);
-				a.dataset.seed = title;
-				a.classList.add('wh-dive');
-				a.removeAttribute('target');
-			} else {
-				a.setAttribute('target', '_blank');
-				a.setAttribute('rel', 'noopener noreferrer');
-				a.classList.add('wh-external');
-			}
-		}
-
-		// Plain left-clicks on article links navigate in-app (smooth); modified clicks
-		// fall through to the rewritten href (new tab) via the default behavior.
-		const onClick = (event: MouseEvent) => {
-			if (event.defaultPrevented || event.button !== 0) return;
-			if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-			const anchor = (event.target as HTMLElement | null)?.closest?.('a');
-			const seed = anchor?.dataset.seed;
-			if (!seed) return;
-			event.preventDefault();
-			goto(`/?seed=${encodeURIComponent(seed)}`);
-		};
-		contentEl.addEventListener('click', onClick);
-		return () => contentEl?.removeEventListener('click', onClick);
-	});
 
 	// Dwell tracking: accumulate time this card is at least half on screen.
 	let el = $state<HTMLElement | null>(null);
@@ -145,9 +79,9 @@
 <div
 	bind:this={el}
 	onclick={handleCardTap}
-	class="animate-rise block overflow-hidden rounded-[var(--radius-card)] border border-hair
+	class="animate-rise block cursor-pointer overflow-hidden rounded-[var(--radius-card)] border border-hair
 		bg-surface/80 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-sm
-		transition-colors hover:border-hair-strong {expanded ? '' : 'cursor-pointer'}"
+		transition-colors hover:border-hair-strong"
 >
 	{#if article.thumbnail}
 		<div class="relative aspect-[16/10] w-full overflow-hidden bg-surface-2">
@@ -239,17 +173,13 @@
 
 			<button
 				type="button"
-				onclick={toggleRead}
-				aria-expanded={expanded}
+				onclick={read}
 				class="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm
-					font-medium transition-colors {expanded
-					? 'text-accent'
-					: 'text-faint hover:text-ink'}"
+					font-medium text-faint transition-colors hover:text-ink"
 			>
-				{expanded ? 'Collapse' : 'Read article'}
+				Read article
 				<svg
-					class="size-3.5 transition-transform {expanded ? 'rotate-180' : ''}
-						{htmlLoading ? 'animate-spin' : ''}"
+					class="size-3.5"
 					viewBox="0 0 24 24"
 					fill="none"
 					stroke="currentColor"
@@ -258,55 +188,9 @@
 					stroke-linejoin="round"
 					aria-hidden="true"
 				>
-					{#if htmlLoading}
-						<path d="M21 12a9 9 0 1 1-6.2-8.6" />
-					{:else}
-						<path d="m6 9 6 6 6-6" />
-					{/if}
+					<path d="m6 9 6 6 6-6" />
 				</svg>
 			</button>
 		</div>
-
-		{#if expanded}
-			<div class="mt-2 border-t border-hair pt-4">
-				{#if htmlLoading}
-					<div class="space-y-2.5" aria-hidden="true">
-						<div class="h-3 w-full animate-pulse rounded-full bg-surface-2"></div>
-						<div class="h-3 w-11/12 animate-pulse rounded-full bg-surface-2"></div>
-						<div class="h-3 w-full animate-pulse rounded-full bg-surface-2"></div>
-						<div class="h-3 w-4/5 animate-pulse rounded-full bg-surface-2"></div>
-					</div>
-				{:else if htmlError}
-					<p class="text-sm text-faint">
-						Couldn't load the article inline.
-						<a
-							href={article.wikiUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="text-accent hover:underline">Open on Wikipedia instead ↗</a
-						>
-					</p>
-				{:else if articleHtml}
-					<div class="max-h-[75vh] overflow-y-auto pr-1">
-						<!-- Sanitized server-side (scripts/handlers stripped); see wikipedia/article.ts -->
-						<div bind:this={contentEl} class="wiki-content">{@html articleHtml}</div>
-					</div>
-					<div class="mt-4 flex items-center justify-between border-t border-hair pt-3">
-						<a
-							href={article.wikiUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="text-xs font-medium text-faint transition-colors hover:text-ink"
-							>Open on Wikipedia ↗</a
-						>
-						<button
-							type="button"
-							onclick={toggleRead}
-							class="text-xs font-medium text-accent hover:underline">Collapse</button
-						>
-					</div>
-				{/if}
-			</div>
-		{/if}
 	</div>
 </div>

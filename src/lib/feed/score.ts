@@ -19,13 +19,18 @@ export function scoreCandidate(candidate: Candidate, ctx: EngineContext): number
 	let relevance = 0;
 	let overlap = 0;
 	for (const token of tokens) {
-		relevance += ctx.tokenWeights[token] ?? 0;
+		// DF-discount: common tokens (appearing in many seen articles) contribute less.
+		// w / (1 + ln(1 + df)) — same form as TF-IDF's IDF component.
+		const weight = ctx.tokenWeights[token] ?? 0;
+		const df = ctx.tokenDocFreq[token] ?? 0;
+		relevance += weight / (1 + Math.log(1 + df));
 		if (ctx.recentTokens.has(token)) overlap += 1;
 	}
 
 	let score = FEED.base;
-	// tanh squashes the interest sum into [-1, 1] so a few hot tokens can't dominate.
-	score += FEED.relevanceWeight * Math.tanh(relevance);
+	// tanh(x/2) softens the squash: one matched token gives ~0.46 of max instead of 0.76
+	// so moderate interest doesn't immediately dominate the score.
+	score += FEED.relevanceWeight * Math.tanh(relevance / 2);
 	score += overlap * FEED.varietyPenalty;
 	if (candidate.thumbnail) score += FEED.imageBonus;
 	if (candidate.relation === 'related') score += FEED.relatedPenalty;

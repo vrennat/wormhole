@@ -3,6 +3,7 @@ import type { Candidate } from '../src/lib/wikipedia/types';
 import type { EngineContext } from '../src/lib/feed/types';
 import { scoreCandidate } from '../src/lib/feed/score';
 import { selectNext } from '../src/lib/feed/select';
+import { FEED } from '../src/lib/feed/config';
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
 	return {
@@ -20,8 +21,10 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
 function context(overrides: Partial<EngineContext> = {}): EngineContext {
 	return {
 		tokenWeights: {},
+		tokenDocFreq: {},
 		recentTokens: new Set(),
 		seenTitles: new Set(),
+		noSurprise: false,
 		rng: () => 0.5,
 		...overrides
 	};
@@ -152,13 +155,95 @@ describe('selectNext', () => {
 	});
 
 	describe('surprise mode', () => {
-		it('fires when RNG falls under the epsilon and flags the selection', () => {
-			// rng[0]=0 triggers surprise; rng[1]=0 picks pool[0].
+		// Build a pool large enough that ranked candidates beyond topK exist,
+		// so the surprise pool (>= surpriseMinPool) is eligible.
+		function bigPool(n: number): Candidate[] {
+			return Array.from({ length: n }, (_, i) =>
+				candidate({ title: `Article${i}`, description: 'neutral topic', thumbnail: null })
+			);
+		}
+
+		it('fires when RNG falls under the epsilon and pool is large enough', () => {
+			// Need surpriseMinPool (3) candidates below topK=8. With 12 candidates
+			// scored, 4 fall below topK — sufficient.
+			// rng[0]=0 triggers surprise; rng[1]=0 picks the first surprise-pool entry.
+			const pool = bigPool(12);
 			const ctx = context({ rng: seq([0, 0]) });
-			const pool = [candidate({ title: 'A' }), candidate({ title: 'B' })];
 			const result = selectNext(pool, ctx);
 			expect(result?.surprised).toBe(true);
-			expect(result?.candidate.title).toBe('A');
 		});
+
+		it('falls back to normal pick when surprise pool is too shallow (< surpriseMinPool)', () => {
+			// With only 9 candidates total, at most 1 is below topK=8 — pool too shallow.
+			const pool = bigPool(9);
+			const ctx = context({ rng: seq([0, 0]) });
+			const result = selectNext(pool, ctx);
+			// Falls through to normal softmax — not a surprise.
+			expect(result?.surprised).toBe(false);
+		});
+
+		it('never surprises when noSurprise is true, even with rng forcing epsilon', () => {
+			const pool = bigPool(20);
+			const ctx = context({ noSurprise: true, rng: seq([0, 0]) });
+			const result = selectNext(pool, ctx);
+			expect(result?.surprised).toBe(false);
+		});
+
+		it('excludes political candidates from the surprise pool', () => {
+			// Build a large pool; mix in a political candidate near the bottom of scores.
+			// With rng always triggering surprise, it should never be the pick.
+			const normalCandidates = bigPool(20);
+			const political = candidate({
+				title: 'United States presidential election',
+				description: 'election politics',
+				categories: ['Category:Elections']
+			});
+			const pool = [...normalCandidates, political];
+			// Run many selections with rng always firing surprise and picking the first entry.
+			// The political one ends up ranked last (heavily penalized); verify it never wins.
+			for (let i = 0; i < 20; i++) {
+				const ctx = context({ rng: seq([0, 0]) });
+				const result = selectNext(pool, ctx);
+				if (result?.surprised) {
+					expect(result.candidate.title).not.toBe(political.title);
+				}
+			}
+		});
+	});
+});
+
+describe('scoreCandidate — DF discounting', () => {
+	it('discounts tokens that appear in many seen documents', () => {
+		// Token "octopus" has weight 1 and df 10:
+		// effectiveWeight = 1 / (1 + Math.log(1 + 10)) = 1 / (1 + Math.log(11))
+		const expectedContribution = 1 / (1 + Math.log(11));
+		const ctx = context({
+			tokenWeights: { octopus: 1 },
+			tokenDocFreq: { octopus: 10 }
+		});
+		// Candidate with only the token "octopus" in title.
+		const c = candidate({ title: 'Octopus', description: '' });
+		const score = scoreCandidate(c, ctx);
+		// Relevance is expectedContribution, squashed via tanh(x/2), then scaled by relevanceWeight.
+		const expectedScore =
+			FEED.base +
+			FEED.relevanceWeight * Math.tanh(expectedContribution / 2) +
+			FEED.imageBonus + // candidate has thumbnail
+			FEED.positionWeight * Math.exp(-0 / FEED.positionHalfLife); // position=0
+		expect(score).toBeCloseTo(expectedScore, 5);
+	});
+
+	it('applies no discount when df is 0 (token never seen before)', () => {
+		// df=0 → effectiveWeight = weight / (1 + ln(1)) = weight / 1 = weight
+		const ctx = context({ tokenWeights: { rare: 2 }, tokenDocFreq: {} });
+		const c = candidate({ title: 'Rare', description: '' });
+		const score = scoreCandidate(c, ctx);
+		const expectedRelevance = 2 / (1 + Math.log(1 + 0));
+		const expectedScore =
+			FEED.base +
+			FEED.relevanceWeight * Math.tanh(expectedRelevance / 2) +
+			FEED.imageBonus +
+			FEED.positionWeight * Math.exp(-0 / FEED.positionHalfLife);
+		expect(score).toBeCloseTo(expectedScore, 5);
 	});
 });

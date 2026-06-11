@@ -1,7 +1,7 @@
 import type { Article, Candidate } from '$lib/wikipedia/types';
 
 /** How a card arrived in the feed — drives the breadcrumb phrasing. */
-export type Relation = 'seed' | 'link' | 'related' | 'surprise';
+export type Relation = 'seed' | 'link' | 'related' | 'surprise' | 'dive';
 
 export interface Connection {
 	/** The title of the article we came from (empty for the seed). */
@@ -16,6 +16,24 @@ export interface FeedCard {
 	connection: Connection;
 }
 
+/** One node in the persistent trail. Detours (surprises) are skipped when deriving the chain tip. */
+export interface TrailNode {
+	id: string;
+	title: string;
+	relation: Relation;
+	fromTitle: string;
+	/** True for surprise cards — the next build fetches from the pre-surprise tip instead. */
+	isDetour: boolean;
+}
+
+/**
+ * Discriminated fetch result so callers can distinguish network failures (retryable)
+ * from genuine empty responses (exhausted) without swallowing errors into empty arrays.
+ */
+export type FetchResult<T> =
+	| { ok: true; data: T }
+	| { ok: false; kind: 'network' | 'notfound' | 'empty' };
+
 /**
  * Everything the pure engine needs to pick the next step. No I/O, no globals —
  * the caller assembles this from the user's engagement profile and feed history,
@@ -24,10 +42,14 @@ export interface FeedCard {
 export interface EngineContext {
 	/** Interest vector: token -> weight, built from articles the user liked/dwelled on. */
 	tokenWeights: Record<string, number>;
+	/** How many distinct seen cards each token appeared in — used for DF discounting. */
+	tokenDocFreq: Record<string, number>;
 	/** Tokens from the last few shown articles, to penalize monotony (variety). */
 	recentTokens: Set<string>;
 	/** Titles already shown, to avoid loops. */
 	seenTitles: Set<string>;
+	/** When true, the engine never fires a surprise (branchFrom, dives). */
+	noSurprise: boolean;
 	/** Injectable RNG (default Math.random) so tests are deterministic. */
 	rng: () => number;
 }

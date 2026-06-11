@@ -7,6 +7,7 @@
 	let query = $state('');
 	let results = $state<SearchResult[]>([]);
 	let loading = $state(false);
+	let highlighted = $state(-1);
 
 	function enter(title: string) {
 		goto(`/?seed=${encodeURIComponent(title)}`);
@@ -18,7 +19,7 @@
 
 	function onSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		const top = results[0]?.title ?? query.trim();
+		const top = highlighted >= 0 ? results[highlighted]?.title : results[0]?.title ?? query.trim();
 		if (top) enter(top);
 	}
 
@@ -47,6 +48,12 @@
 			ignore = true;
 			clearTimeout(timer);
 		};
+	});
+
+	// Reset highlighted when results change.
+	$effect(() => {
+		results;
+		highlighted = -1;
 	});
 </script>
 
@@ -82,6 +89,21 @@
 			bind:value={query}
 			placeholder="Search any topic…"
 			autocomplete="off"
+			role="combobox"
+			aria-expanded={query.trim().length >= 2 && results.length > 0}
+			aria-controls="search-listbox"
+			aria-activedescendant={highlighted >= 0 ? `start-result-${highlighted}` : undefined}
+			onkeydown={(e) => {
+				if (e.key === 'ArrowDown') {
+					e.preventDefault();
+					highlighted = Math.min(highlighted + 1, results.length - 1);
+				} else if (e.key === 'ArrowUp') {
+					e.preventDefault();
+					highlighted = Math.max(highlighted - 1, -1);
+				} else if (e.key === 'Escape') {
+					highlighted = -1;
+				}
+			}}
 			class="w-full rounded-2xl border border-hair bg-surface/80 py-3.5 pr-4 pl-11 text-ink
 				placeholder:text-faint focus:border-accent/60 focus:ring-2 focus:ring-accent/20
 				focus:outline-none"
@@ -89,6 +111,8 @@
 
 		{#if query.trim().length >= 2}
 			<ul
+				id="search-listbox"
+				role="listbox"
 				class="absolute z-10 mt-2 w-full overflow-hidden rounded-2xl border border-hair
 					bg-surface text-left shadow-2xl shadow-black/40"
 			>
@@ -97,13 +121,14 @@
 				{:else if results.length === 0}
 					<li class="px-4 py-3 text-sm text-faint">No matches. Press Enter to try anyway.</li>
 				{:else}
-					{#each results as result (result.title)}
-						<li>
+					{#each results as result, index (result.title)}
+						<li role="option" aria-selected={highlighted === index}>
 							<button
 								type="button"
+								id="start-result-{index}"
 								onclick={() => enter(result.title)}
 								class="flex w-full items-center gap-3 px-4 py-2.5 text-left
-									transition-colors hover:bg-surface-2"
+									transition-colors hover:bg-surface-2 {highlighted === index ? 'bg-surface-2' : ''}"
 							>
 								{#if result.thumbnail}
 									<img

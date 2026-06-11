@@ -1,22 +1,47 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 	import { feed } from '$lib/feed/feedState.svelte';
+	import { loadTrail } from '$lib/feed/trail';
 	import type { FeedCard } from '$lib/feed/types';
 	import { randomSeed } from '$lib/seeds';
 	import ArticleCard from '$lib/components/ArticleCard.svelte';
+	import ArticleOverlay from '$lib/components/ArticleOverlay.svelte';
+	import TrailPanel from '$lib/components/TrailPanel.svelte';
 	import SkeletonCard from '$lib/components/SkeletonCard.svelte';
 
 	const seedParam = $derived(page.url.searchParams.get('seed'));
 
-	// Start (or restart) the rabbit hole when the seed changes; auto-seed a bare visit.
+	// Rehydrate an existing session or start fresh. Runs on mount and whenever
+	// seedParam changes. rehydrate() returns false when no matching trail exists,
+	// in which case start() kicks off a fresh wormhole. The cancelled flag stops a
+	// superseded run from starting the wormhole it was navigated away from.
 	$effect(() => {
-		const seed = seedParam ?? undefined;
-		if (seed) {
-			if (seed !== feed.seedTitle) feed.start(seed);
-		} else if (feed.status === 'idle' && feed.cards.length === 0) {
-			feed.start(randomSeed().title);
-		}
+		const seed = seedParam;
+		let cancelled = false;
+		(async () => {
+			const stored = browser ? loadTrail() : null;
+			const seedMatches = stored && (seed === null || seed === stored.seedTitle);
+
+			if (seedMatches) {
+				const ok = await feed.rehydrate(seed);
+				if (cancelled) return;
+				if (!ok) {
+					if (seed) feed.start(seed);
+					else if (feed.status === 'idle') feed.start(randomSeed().title);
+				}
+			} else {
+				if (seed) {
+					if (seed !== feed.seedTitle) feed.start(seed);
+				} else if (feed.status === 'idle' && feed.cards.length === 0) {
+					feed.start(randomSeed().title);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	let sentinel = $state<HTMLElement | null>(null);
@@ -41,7 +66,7 @@
 				const before = feed.cards.length;
 				await feed.more();
 				await tick();
-				if (feed.cards.length === before) break; // no progress — avoid spinning
+				if (feed.cards.length === before) break;
 			}
 		} finally {
 			pumping = false;
@@ -68,11 +93,72 @@
 			.querySelector(`[data-card="${id}"]`)
 			?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
+
+	// Overlay state: the card currently open in the reader (null = closed).
+	let readerCard = $state<FeedCard | null>(null);
+
+	function handleRead(card: FeedCard) {
+		readerCard = card;
+	}
+
+	function handleOverlayClose() {
+		readerCard = null;
+	}
+
+	async function handleDive(title: string) {
+		readerCard = null;
+		const id = await feed.addDive(title);
+		if (!id) return;
+		await tick();
+		document
+			.querySelector(`[data-card="${id}"]`)
+			?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	let jumpingRelated = $state(false);
+
+	async function handleJumpRelated() {
+		if (jumpingRelated) return;
+		jumpingRelated = true;
+		try {
+			const ok = await feed.jumpRelated();
+			if (!ok) feed.showStartOver = true;
+		} finally {
+			jumpingRelated = false;
+		}
+	}
+
+	let trailOpen = $state(false);
+
+	async function handleTrailSelect(id: string) {
+		trailOpen = false;
+		await tick();
+		document
+			.querySelector(`[data-card="${id}"]`)
+			?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
 </script>
 
 <svelte:head>
 	<title>{feed.seedTitle ? `${feed.seedTitle} · Wormhole` : 'Wormhole'}</title>
 </svelte:head>
+
+{#if readerCard}
+	<ArticleOverlay
+		article={readerCard.article}
+		onClose={handleOverlayClose}
+		onDive={handleDive}
+	/>
+{/if}
+
+{#if trailOpen}
+	<TrailPanel
+		trail={feed.trail}
+		presentIds={new Set(feed.cards.map((c) => c.id))}
+		onClose={() => (trailOpen = false)}
+		onSelect={handleTrailSelect}
+	/>
+{/if}
 
 {#if feed.status === 'error'}
 	<div class="flex flex-col items-center gap-4 py-20 text-center">
@@ -90,16 +176,36 @@
 		<SkeletonCard />
 	</div>
 {:else}
-	{#if feed.cards.length > 1}
-		<p class="mb-5 text-center text-xs font-medium tracking-widest text-faint uppercase">
-			{feed.cards.length} articles deep
-		</p>
+	{#if feed.trail.length > 1}
+		<!-- Sticky depth chip: replaces the scroll-away counter. Always visible, opens the trail panel. -->
+		<div class="sticky top-14 z-10 mb-5 flex justify-center">
+			<button
+				type="button"
+				onclick={() => (trailOpen = true)}
+				class="inline-flex items-center gap-1.5 rounded-full border border-hair bg-void/80
+					px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-sm transition-colors
+					hover:border-accent/50 hover:text-accent"
+			>
+				{feed.trail.length} deep
+				<svg
+					class="size-3"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<path d="m6 9 6 6 6-6" />
+				</svg>
+			</button>
+		</div>
 	{/if}
 
 	<div class="space-y-5">
 		{#each feed.cards as card (card.id)}
 			<div data-card={card.id} class="scroll-mt-20">
-				<ArticleCard {card} onBranch={handleBranch} />
+				<ArticleCard {card} onBranch={handleBranch} onRead={handleRead} />
 			</div>
 		{/each}
 	</div>
@@ -107,9 +213,32 @@
 	<div bind:this={sentinel} class="h-4"></div>
 
 	<div class="py-8">
-		{#if feed.isExhausted}
+		{#if feed.status === 'stalled'}
+			<div class="flex flex-col items-center gap-4 text-center">
+				<p class="text-sm text-muted">Connection hiccup.</p>
+				<button
+					type="button"
+					onclick={() => feed.retry()}
+					class="rounded-full border border-hair px-4 py-2 text-sm font-medium text-muted
+						transition-colors hover:border-accent/50 hover:text-accent"
+				>
+					Retry
+				</button>
+			</div>
+		{:else if feed.isExhausted}
 			<div class="flex flex-col items-center gap-4 text-center">
 				<p class="text-sm text-muted">This wormhole has collapsed — no more links to follow.</p>
+				{#if !feed.showStartOver}
+					<button
+						type="button"
+						onclick={handleJumpRelated}
+						disabled={jumpingRelated}
+						class="rounded-full bg-accent px-4 py-2 text-sm font-medium text-void
+							transition-opacity hover:opacity-90 disabled:opacity-50"
+					>
+						{jumpingRelated ? 'Jumping…' : 'Jump somewhere related'}
+					</button>
+				{/if}
 				<a
 					href="/start"
 					class="rounded-full border border-hair px-4 py-2 text-sm font-medium text-muted

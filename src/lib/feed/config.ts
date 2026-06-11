@@ -38,12 +38,36 @@ export const FEED = {
 	topK: 8,
 	/** Softmax temperature for that weighted pick. Higher = more random among the top. */
 	temperature: 0.6,
-	/** How many recent articles feed the variety penalty. */
-	recentWindow: 3,
+	/** How many recent articles feed the variety penalty (widened so the immediate parent is excluded separately). */
+	recentWindow: 5,
 	/** Weight added to a token each time the user likes an article containing it. */
 	likeTokenWeight: 1,
+	/** Weight added when the user explicitly clicks through to read an article — stronger than passive dwell. */
+	clickthroughTokenWeight: 0.7,
 	/** Lighter weight for tokens from articles the user merely dwelled on. */
-	dwellTokenWeight: 0.35,
+	dwellTokenWeight: 0.2,
 	/** Dwell milliseconds before an article counts as "engaged with". */
-	dwellThresholdMs: 4000
+	dwellThresholdMs: 4000,
+	/** Multiply all token weights by this at the start of each session so stale interests fade. */
+	sessionDecay: 0.85,
+	/** Drop tokens below this floor when decaying — noise that decay brought down this far is useless. */
+	sessionDecayFloor: 0.05,
+	/** Single token weight ceiling; prevents one obsession from drowning everything else out. */
+	tokenWeightCap: 3,
+	/** Minimum score for a candidate to qualify for the surprise pool (excludes garbage at the bottom). */
+	surpriseFloor: 0.1,
+	/**
+	 * Minimum usable mid-tier candidates (below top-K) for a surprise to fire.
+	 * Equivalent to requiring a total scored pool of roughly topK + this many —
+	 * a dud surprise from a near-empty middle is worse than no surprise.
+	 */
+	surpriseMinPool: 3,
+	/** sessionStorage key used to persist the trail (titles + relations only — tiny). */
+	trailStorageKey: 'wormhole:trail:v1',
+	/** Maximum trail nodes stored; older entries are dropped from the tail. */
+	trailCap: 100,
+	/** How many of the stored trail's latest nodes we refetch on rehydration (cold-cache budget). */
+	rehydrateRestoreCap: 20,
+	/** sessionStorage sentinel that gates decay to once per tab session. */
+	decayStorageKey: 'wormhole:decay:v1'
 } as const;

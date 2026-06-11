@@ -8,7 +8,8 @@
 			seed: 'You started here',
 			link: 'Linked from',
 			related: 'Related to',
-			surprise: 'Wormhole jump from'
+			surprise: 'Wormhole jump from',
+			dive: 'Dove in from'
 		}[connection.relation]
 	);
 
