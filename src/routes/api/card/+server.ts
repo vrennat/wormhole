@@ -11,21 +11,28 @@ export const GET: RequestHandler = async ({ url, setHeaders }) => {
 	if (!title) return json({ article: null, error: 'missing title' }, { status: 400 });
 
 	try {
-		const article = await cached(`card:${title}`, TTL.long, async () => {
-			const a = await fetchArticle(title);
-			if (!a || a.thumbnail) return a;
+		let article = await cached(`card:${title}`, TTL.long, () => fetchArticle(title));
 
-			// No PageImages lead image (common on broad concept pages) — fall back to
-			// the first substantial image in the article body. Shares the reader's
-			// cache key, so an imageless card prefetches the inline article for free.
-			// Best-effort: an upstream failure here must not sink the card.
+		// No PageImages lead image (common on broad concept pages) — fall back to the
+		// first substantial image in the article body. Cached under its own key, and
+		// only on success: a transient upstream failure throws out of cached(), so the
+		// next request retries instead of serving a degraded card for a day. Shares
+		// the reader's article: key, so an imageless card prefetches the inline
+		// article for free.
+		if (article && !article.thumbnail) {
 			try {
-				const html = await cached(`article:${a.title}`, TTL.long, () => fetchArticleHtml(a.title));
-				return { ...a, thumbnail: html ? extractLeadImage(html) : null };
+				const thumbnail = await cached(`leadimg:${article.title}`, TTL.long, async () => {
+					const html = await cached(`article:${article!.title}`, TTL.long, () =>
+						fetchArticleHtml(article!.title)
+					);
+					return html ? extractLeadImage(html) : null;
+				});
+				if (thumbnail) article = { ...article, thumbnail };
 			} catch {
-				return a;
+				// Best-effort: the card ships without an image rather than failing.
 			}
-		});
+		}
+
 		setHeaders({ 'cache-control': 'public, max-age=3600' });
 		return json({ article });
 	} catch {
