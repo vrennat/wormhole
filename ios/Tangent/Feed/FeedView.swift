@@ -9,6 +9,7 @@ struct FeedView: View {
 
 	@State private var currentID: String?
 	@State private var readArticle: Article?
+	@State private var showLiked = false
 
 	init(profile: EngagementProfile) {
 		self.profile = profile
@@ -48,12 +49,15 @@ struct FeedView: View {
 				overlayState
 			}
 
-			wordmark
+			topBar
 		}
 		.task { if store.cards.isEmpty { await store.start(Seeds.cold().title) } }
 		.sensoryFeedback(.selection, trigger: currentID)
 		.fullScreenCover(item: $readArticle) { article in
 			ReaderContainer(rootTitle: article.title, profile: profile) { readArticle = nil }
+		}
+		.sheet(isPresented: $showLiked) {
+			LikedView(profile: profile) { showLiked = false }
 		}
 		.preferredColorScheme(.dark)
 	}
@@ -80,17 +84,43 @@ struct FeedView: View {
 		}
 	}
 
-	private var wordmark: some View {
+	private var topBar: some View {
 		VStack {
 			HStack {
 				Text("Tangent")
 					.font(Theme.serif(17, .semibold))
 					.foregroundStyle(Theme.ink.opacity(0.85))
 				Spacer()
+				likedButton
 			}
 			.padding(.horizontal, 28)
 			.padding(.top, 8)
 			Spacer()
 		}
+	}
+
+	/// Opens the Liked collection. Fills + warms once you have likes, with a count badge,
+	/// so the feature is discoverable from the otherwise chrome-free feed.
+	private var likedButton: some View {
+		let count = profile.likedArticles.count
+		return Button { showLiked = true } label: {
+			Image(systemName: count == 0 ? "star" : "star.fill")
+				.font(.system(size: 18))
+				.foregroundStyle(count == 0 ? Theme.muted : Theme.like)
+				.overlay(alignment: .topTrailing) {
+					if count > 0 {
+						Text("\(count)")
+							.font(Theme.ui(10, .semibold))
+							.foregroundStyle(Theme.ink)
+							.padding(.horizontal, 4)
+							.padding(.vertical, 1)
+							.background(Theme.surface, in: Capsule())
+							.overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+							.offset(x: 11, y: -9)
+						}
+				}
+		}
+		.buttonStyle(.plain)
+		.accessibilityLabel("Liked articles, \(count)")
 	}
 }
