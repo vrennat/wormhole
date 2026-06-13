@@ -4,6 +4,7 @@
 	import { SEEDS, randomSeed } from '$lib/seeds';
 	import BrandMark from '$lib/components/BrandMark.svelte';
 	import RelationIcon from '$lib/components/RelationIcon.svelte';
+	import { Search } from '@lucide/svelte';
 
 	let query = $state('');
 	let results = $state<SearchResult[]>([]);
@@ -77,18 +78,10 @@
 	</p>
 
 	<form onsubmit={onSubmit} class="relative mt-8 w-full max-w-md">
-		<svg
+		<Search
 			class="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-faint"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
 			aria-hidden="true"
-		>
-			<circle cx="11" cy="11" r="7" />
-			<path d="m21 21-4.3-4.3" />
-		</svg>
+		/>
 		<input
 			type="search"
 			bind:value={query}

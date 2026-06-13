@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/state';
+	import { Waypoints, SlidersHorizontal, Plus } from '@lucide/svelte';
 	import BrandMark from '$lib/components/BrandMark.svelte';
 	import ProfilePopover from '$lib/components/ProfilePopover.svelte';
 	import { profile } from '$lib/engagement/profile.svelte';
@@ -50,22 +51,8 @@
 						class="icon-btn relative inline-flex items-center justify-center rounded-full p-1.5
 							text-muted transition-colors hover:bg-surface-2 hover:text-ink"
 					>
-						<!-- Trail: a winding path of waypoints — the route you've walked. -->
-						<svg
-							class="size-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d="M4 18 11 8 20 14" />
-							<circle cx="4" cy="18" r="1.7" fill="currentColor" stroke="none" />
-							<circle cx="11" cy="8" r="1.7" fill="currentColor" stroke="none" />
-							<circle cx="20" cy="14" r="1.7" fill="currentColor" stroke="none" />
-						</svg>
+						<!-- Trail: connected waypoints — the path of articles you've visited. -->
+						<Waypoints class="size-5" aria-hidden="true" />
 						<span
 							class="absolute -right-0.5 -top-0.5 grid h-4 min-w-[1rem] place-items-center
 								rounded-full bg-surface-2 px-1 text-[10px] font-semibold text-muted ring-1 ring-hair"
@@ -85,20 +72,7 @@
 							text-muted transition-colors hover:bg-surface-2 hover:text-ink"
 					>
 						<!-- Interests: tuning sliders — the panel tunes your feed (no account). -->
-						<svg
-							class="size-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							aria-hidden="true"
-						>
-							<line x1="4" y1="8.5" x2="20" y2="8.5" />
-							<line x1="4" y1="15.5" x2="20" y2="15.5" />
-							<circle cx="9" cy="8.5" r="2.4" fill="currentColor" stroke="none" />
-							<circle cx="15" cy="15.5" r="2.4" fill="currentColor" stroke="none" />
-						</svg>
+						<SlidersHorizontal class="size-5" aria-hidden="true" />
 						{#if hasProfile}
 							<!-- Dot signals that the feed is actively personalized. -->
 							<span
@@ -119,17 +93,7 @@
 					class="inline-flex items-center gap-1.5 rounded-full border border-hair px-3 py-1.5
 						text-sm font-medium text-muted transition-colors hover:border-accent/50 hover:text-accent"
 				>
-					<svg
-						class="size-4"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						aria-hidden="true"
-					>
-						<path d="M12 5v14M5 12h14" />
-					</svg>
+					<Plus class="size-4" aria-hidden="true" />
 					New tangent
 				</a>
 			</div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { ArrowLeft } from '@lucide/svelte';
+
 	// Static content page — what Tangent is, plus the licensing, privacy, and terms
 	// notices a launch needs. Links open in a new tab so a reader doesn't lose their place.
 	const linkClass =
@@ -103,18 +105,7 @@
 			href="/"
 			class="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-accent"
 		>
-			<svg
-				class="size-4"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-			>
-				<path d="M19 12H5M11 6l-6 6 6 6" />
-			</svg>
+			<ArrowLeft class="size-4" aria-hidden="true" />
 			Back to your tangent
 		</a>
 	</footer>

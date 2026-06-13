@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TrailNode } from '$lib/feed/types';
 	import RelationIcon from './RelationIcon.svelte';
+	import { X } from '@lucide/svelte';
 
 	let {
 		trail,
@@ -67,17 +68,7 @@
 				class="icon-btn inline-flex items-center justify-center rounded-full p-1.5
 					text-muted transition-colors hover:bg-surface-2 hover:text-ink"
 			>
-				<svg
-					class="size-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					aria-hidden="true"
-				>
-					<path d="M18 6 6 18M6 6l12 12" />
-				</svg>
+				<X class="size-4" aria-hidden="true" />
 			</button>
 		</div>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { FeedCard } from '$lib/feed/types';
+	import { Star, CirclePlus, LoaderCircle, ArrowRight } from '@lucide/svelte';
 	import { profile } from '$lib/engagement/profile.svelte';
 	import ConnectionBreadcrumb from './ConnectionBreadcrumb.svelte';
 
@@ -141,20 +142,12 @@
 					? 'border-like/40 bg-like/10 text-like'
 					: 'border-hair text-muted hover:border-hair-strong hover:text-ink'}"
 			>
-				<!-- Favorite star — the geometric mark for like, filled when active. -->
-				<svg
+				<!-- Favorite star — filled when active. -->
+				<Star
 					class="size-4 transition-transform group-active:scale-110"
-					viewBox="0 0 24 24"
 					fill={liked ? 'currentColor' : 'none'}
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linejoin="round"
 					aria-hidden="true"
-				>
-					<path
-						d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-					/>
-				</svg>
+				/>
 				{liked ? 'Liked' : 'Like'}
 			</button>
 
@@ -166,22 +159,11 @@
 					text-sm font-medium text-muted transition-all hover:border-accent/50
 					hover:text-accent active:scale-95 disabled:opacity-50"
 			>
-				<svg
-					class="size-4 {branching ? 'animate-spin' : ''}"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					aria-hidden="true"
-				>
-					{#if branching}
-						<path d="M21 12a9 9 0 1 1-6.2-8.6" />
-					{:else}
-						<path d="M12 3v18M3 12h18" opacity="0.5" />
-						<circle cx="12" cy="12" r="9" opacity="0.5" />
-					{/if}
-				</svg>
+				{#if branching}
+					<LoaderCircle class="size-4 animate-spin" aria-hidden="true" />
+				{:else}
+					<CirclePlus class="size-4" aria-hidden="true" />
+				{/if}
 				More like this
 			</button>
 
@@ -193,18 +175,7 @@
 			>
 				Read article
 				<!-- Arrow, not a chevron: this opens the reader pane, it doesn't expand in place. -->
-				<svg
-					class="size-3.5 transition-transform group-hover:translate-x-0.5"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M5 12h14M13 6l6 6-6 6" />
-				</svg>
+				<ArrowRight class="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
 			</button>
 		</div>
 	</div>

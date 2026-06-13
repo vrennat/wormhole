@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import type { Article } from '$lib/wikipedia/types';
 	import { articleTitleFromHref } from '$lib/wikipedia/links';
+	import { X } from '@lucide/svelte';
 
 	let {
 		article,
@@ -136,17 +137,7 @@
 			class="icon-btn mt-0.5 inline-flex shrink-0 items-center justify-center rounded-full p-1.5
 				text-muted transition-colors hover:bg-surface-2 hover:text-ink"
 		>
-			<svg
-				class="size-5"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				aria-hidden="true"
-			>
-				<path d="M18 6 6 18M6 6l12 12" />
-			</svg>
+			<X class="size-5" aria-hidden="true" />
 		</button>
 	</div>
 
