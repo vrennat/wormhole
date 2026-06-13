@@ -19,25 +19,30 @@ struct FeedView: View {
 		ZStack {
 			Theme.void.ignoresSafeArea()
 
-			ScrollView(.vertical) {
-				LazyVStack(spacing: 0) {
-					ForEach(Array(store.cards.enumerated()), id: \.element.id) { index, card in
-						ArticleCardView(card: card, profile: profile) { readArticle = $0 }
-							.containerRelativeFrame([.horizontal, .vertical])
-							.id(card.id)
-							.onAppear { store.didReveal(card, at: index) }
-					}
+			GeometryReader { proxy in
+				ScrollView(.vertical) {
+					LazyVStack(spacing: 0) {
+						ForEach(Array(store.cards.enumerated()), id: \.element.id) { index, card in
+							ArticleCardView(card: card, profile: profile) { readArticle = $0 }
+								.frame(width: proxy.size.width, height: proxy.size.height)
+								.clipped()
+								.id(card.id)
+								.onAppear { store.didReveal(card, at: index) }
+						}
 
-					if store.status == .exhausted {
-						exhaustedFooter.containerRelativeFrame([.horizontal, .vertical])
+						if store.status == .exhausted {
+							exhaustedFooter
+								.frame(width: proxy.size.width, height: proxy.size.height)
+						}
 					}
+					.scrollTargetLayout()
 				}
-				.scrollTargetLayout()
+				.frame(width: proxy.size.width, height: proxy.size.height)
+				.scrollTargetBehavior(.paging)
+				.scrollIndicators(.hidden)
+				.ignoresSafeArea()
+				.scrollPosition(id: $currentID)
 			}
-			.scrollTargetBehavior(.paging)
-			.scrollIndicators(.hidden)
-			.ignoresSafeArea()
-			.scrollPosition(id: $currentID)
 
 			if store.cards.isEmpty {
 				overlayState

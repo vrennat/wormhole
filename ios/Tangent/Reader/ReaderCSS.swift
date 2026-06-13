@@ -50,13 +50,22 @@ enum ReaderCSS {
 	ul, ol { margin: 0 0 0.9em; padding-left: 1.4em; }
 	li { margin: 0.25em 0; }
 	ul { list-style: disc; } ol { list-style: decimal; }
-	img { max-width: 100%; height: auto; border-radius: 0.5rem; background: var(--surface); }
+	img, video { max-width: 100%; height: auto; border-radius: 0.5rem; background: var(--surface); }
+	video { display: block; margin-inline: auto; }
 	figure { margin: 1.5em auto; max-width: min(100%, 30rem); text-align: center; }
-	figure img { display: block; margin-inline: auto; }
+	figure img, figure video { display: block; margin-inline: auto; }
 	figure.mw-halign-left, figure.mw-halign-right,
 	.mw-halign-left, .mw-halign-right { float: none; margin-inline: auto; }
-	.thumb { float: none; margin: 1.5em 0; }
-	.thumbinner { margin-inline: auto; }
+	.thumb { float: none; margin: 1.5em auto; max-width: 100%; text-align: center; }
+	.thumbinner { margin-inline: auto; max-width: 100%; }
+	.gallerybox, .gallerybox .thumb { margin-inline: auto; text-align: center; }
+	.infobox-image, .infobox-full-data { text-align: center; }
+	.infobox-image .mw-default-size,
+	.infobox-image .mw-file-description,
+	.infobox-image .mw-file-element,
+	.infobox-full-data .mw-file-element {
+	  display: block; margin-inline: auto;
+	}
 	figcaption, .thumbcaption {
 	  font-size: 0.8rem; color: var(--faint); margin-top: 0.5em;
 	  text-align: center; line-height: 1.5;

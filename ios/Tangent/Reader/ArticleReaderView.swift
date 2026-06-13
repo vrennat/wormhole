@@ -43,7 +43,7 @@ struct ArticleReaderView: View {
 	private func load() async {
 		phase = .loading
 		do {
-			if let html = try await APIClient.shared.article(title: title) {
+			if let html = try await ArticleHTMLCache.shared.html(for: title) {
 				phase = .loaded(html)
 			} else {
 				phase = .failed

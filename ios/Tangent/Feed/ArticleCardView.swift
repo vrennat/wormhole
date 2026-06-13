@@ -69,7 +69,10 @@ struct ArticleCardView: View {
 		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 		.background(Theme.void)
 		.sensoryFeedback(.impact(weight: .medium), trigger: isLiked)
-		.onAppear { appearedAt = Date() }
+		.onAppear {
+			appearedAt = Date()
+			Task { _ = try? await ArticleHTMLCache.shared.html(for: article.title) }
+		}
 		.onDisappear {
 			if let start = appearedAt {
 				profile.recordDwell(article, ms: Date().timeIntervalSince(start) * 1000)
@@ -82,7 +85,7 @@ struct ArticleCardView: View {
 			Button {
 				profile.toggleLike(article)
 			} label: {
-				Image(systemName: isLiked ? "heart.fill" : "heart")
+				Image(systemName: isLiked ? "star.fill" : "star")
 					.font(.system(size: 22))
 					.foregroundStyle(isLiked ? Theme.like : Theme.muted)
 			}
