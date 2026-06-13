@@ -25,6 +25,10 @@ final class EngagementProfile {
 	private(set) var tokenWeights: [String: Double] = [:]
 	private(set) var tokenDocFreq: [String: Int] = [:]
 	private(set) var likedTitles: Set<String> = []
+	/// Liked articles, most-recent-first, backing the Liked collection screen. Kept in
+	/// lockstep with `likedTitles`; stores the full `Article` so unliking from the list
+	/// still has the server tokens to decrement.
+	private(set) var likedArticles: [Article] = []
 	private(set) var seenCount = 0
 
 	private var clickthroughs: Set<String> = []
@@ -46,9 +50,11 @@ final class EngagementProfile {
 	func toggleLike(_ article: Article) {
 		if likedTitles.contains(article.title) {
 			likedTitles.remove(article.title)
+			likedArticles.removeAll { $0.title == article.title }
 			bump(article.tokens, by: -Tune.likeTokenWeight)
 		} else {
 			likedTitles.insert(article.title)
+			likedArticles.insert(article, at: 0)
 			bump(article.tokens, by: Tune.likeTokenWeight)
 		}
 		save()
@@ -85,7 +91,7 @@ final class EngagementProfile {
 	}
 
 	func reset() {
-		tokenWeights = [:]; tokenDocFreq = [:]; likedTitles = []; seenCount = 0
+		tokenWeights = [:]; tokenDocFreq = [:]; likedTitles = []; likedArticles = []; seenCount = 0
 		clickthroughs = []; engaged = []; seenForDf = []; dwellMs = [:]
 		save()
 	}
@@ -124,6 +130,9 @@ final class EngagementProfile {
 		var tokenWeights: [String: Double]
 		var tokenDocFreq: [String: Int]
 		var likedTitles: [String]
+		// Optional so profiles saved before the Liked screen still decode (a missing
+		// non-optional field would throw, get swallowed by `try?`, and wipe everything).
+		var likedArticles: [Article]?
 		var clickthroughs: [String]
 		var engaged: [String]
 		var seenForDf: [String]
@@ -137,6 +146,7 @@ final class EngagementProfile {
 		tokenWeights = snap.tokenWeights
 		tokenDocFreq = snap.tokenDocFreq
 		likedTitles = Set(snap.likedTitles)
+		likedArticles = snap.likedArticles ?? []
 		clickthroughs = Set(snap.clickthroughs)
 		engaged = Set(snap.engaged)
 		seenForDf = Set(snap.seenForDf)
@@ -147,7 +157,8 @@ final class EngagementProfile {
 	private func save() {
 		let snap = Snapshot(
 			tokenWeights: tokenWeights, tokenDocFreq: tokenDocFreq,
-			likedTitles: Array(likedTitles), clickthroughs: Array(clickthroughs),
+			likedTitles: Array(likedTitles), likedArticles: likedArticles,
+			clickthroughs: Array(clickthroughs),
 			engaged: Array(engaged), seenForDf: Array(seenForDf),
 			dwellMs: dwellMs, seenCount: seenCount
 		)
