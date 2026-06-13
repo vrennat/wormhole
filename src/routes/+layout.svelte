@@ -11,7 +11,6 @@
 
 	let { children } = $props();
 
-	const hasProfile = $derived(Object.keys(profile.tokenWeights).length > 0);
 	// Trail = articles you've actually reached (scrolled to / dwelled on). Shown in the
 	// header once there's more than just the seed, so it's reachable without a floating chip.
 	// Only on the feed route — that's where the panel itself is rendered.
@@ -67,25 +66,18 @@
 					</button>
 				{/if}
 
-				<!-- Profile affordance: icon button with accent dot when interests are active. -->
+				<!-- Profile affordance: opens the interests panel (feed tuning, no account). -->
 				<button
 					type="button"
 					onclick={() => (profileOpen = !profileOpen)}
 					aria-label="Your interests"
 					aria-expanded={profileOpen}
 					aria-haspopup="dialog"
-					class="icon-btn relative inline-flex items-center justify-center rounded-full p-1.5
+					class="icon-btn inline-flex items-center justify-center rounded-full p-1.5
 						text-muted transition-colors hover:bg-surface-2 hover:text-ink"
 				>
 					<!-- Interests: tuning sliders — the panel tunes your feed (no account). -->
 					<SlidersHorizontal class="size-5" aria-hidden="true" />
-					{#if hasProfile}
-						<!-- Dot signals that the feed is actively personalized. -->
-						<span
-							class="absolute right-1 top-1 size-2 rounded-full bg-accent"
-							aria-hidden="true"
-						></span>
-					{/if}
 				</button>
 
 				{#if profileOpen}
