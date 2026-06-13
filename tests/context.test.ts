@@ -4,13 +4,16 @@ import type { InterestPayload, SessionPayload } from '../src/lib/feed/types';
 
 const interest: InterestPayload = {
 	tokenWeights: { roman: 2, empire: 1 },
-	tokenDocFreq: { roman: 3 }
+	tokenAvoidWeights: { aqueduct: 0.5 },
+	tokenDocFreq: { roman: 3 },
+	taste: 'history'
 };
 
 const session: SessionPayload = {
 	seenTitles: ['Roman Empire', 'Aqueduct'],
 	recentTokens: ['roman', 'water'],
-	noSurprise: true
+	noSurprise: true,
+	stepIndex: 7
 };
 
 describe('buildEngineContext', () => {
@@ -19,12 +22,15 @@ describe('buildEngineContext', () => {
 			const ctx = buildEngineContext(interest, session, () => 0.5);
 
 			expect(ctx.tokenWeights).toEqual({ roman: 2, empire: 1 });
+			expect(ctx.tokenAvoidWeights).toEqual({ aqueduct: 0.5 });
 			expect(ctx.tokenDocFreq).toEqual({ roman: 3 });
+			expect(ctx.taste).toBe('history');
 			expect(ctx.seenTitles).toBeInstanceOf(Set);
 			expect(ctx.seenTitles.has('Aqueduct')).toBe(true);
 			expect(ctx.recentTokens).toBeInstanceOf(Set);
 			expect(ctx.recentTokens.has('water')).toBe(true);
 			expect(ctx.noSurprise).toBe(true);
+			expect(ctx.stepIndex).toBe(7);
 			expect(ctx.rng()).toBe(0.5);
 		});
 	});
@@ -48,7 +54,19 @@ describe('buildEngineContext', () => {
 
 			expect(ctx.seenTitles.size).toBe(0);
 			expect(ctx.recentTokens.size).toBe(0);
+			expect(ctx.tokenAvoidWeights).toEqual({});
+			expect(ctx.taste).toBe('balanced');
 			expect(ctx.noSurprise).toBe(false);
+			expect(ctx.stepIndex).toBe(0);
+		});
+
+		it('normalizes unknown taste values for older or malformed clients', () => {
+			const ctx = buildEngineContext(
+				{ tokenWeights: {}, tokenDocFreq: {}, taste: 'weird' as never },
+				{ seenTitles: [], recentTokens: [] }
+			);
+
+			expect(ctx.taste).toBe('balanced');
 		});
 	});
 });

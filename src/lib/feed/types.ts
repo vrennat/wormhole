@@ -1,4 +1,5 @@
 import type { Article, Candidate } from '$lib/wikipedia/types';
+import type { TasteId } from './taste';
 
 /** How a card arrived in the feed — drives the breadcrumb phrasing. */
 export type Relation = 'seed' | 'link' | 'related' | 'surprise' | 'dive';
@@ -48,14 +49,20 @@ export type FetchResult<T> =
 export interface EngineContext {
 	/** Interest vector: token -> weight, built from articles the user liked/dwelled on. */
 	tokenWeights: Record<string, number>;
+	/** Avoidance vector: token -> weight, built from cards skipped quickly. */
+	tokenAvoidWeights: Record<string, number>;
 	/** How many distinct seen cards each token appeared in — used for DF discounting. */
 	tokenDocFreq: Record<string, number>;
+	/** Explicit user steering: a soft boost, not a hard filter. */
+	taste: TasteId;
 	/** Tokens from the last few shown articles, to penalize monotony (variety). */
 	recentTokens: Set<string>;
 	/** Titles already shown, to avoid loops. */
 	seenTitles: Set<string>;
 	/** When true, the engine never fires a surprise (branchFrom, dives). */
 	noSurprise: boolean;
+	/** Approximate chain position used for pacing slots. */
+	stepIndex: number;
 	/** Injectable RNG (default Math.random) so tests are deterministic. */
 	rng: () => number;
 }
@@ -73,7 +80,11 @@ export interface Selection {
  */
 export interface InterestPayload {
 	tokenWeights: Record<string, number>;
+	/** Optional for backward compatibility with older clients. Defaults to empty. */
+	tokenAvoidWeights?: Record<string, number>;
 	tokenDocFreq: Record<string, number>;
+	/** Optional for backward compatibility with older clients. Defaults to balanced. */
+	taste?: TasteId;
 }
 
 /**
@@ -87,6 +98,8 @@ export interface SessionPayload {
 	recentTokens: string[];
 	/** When true, the engine never fires a surprise (deliberate steering: branch/dive). */
 	noSurprise?: boolean;
+	/** Approximate chain position for pacing. Defaults to seenTitles.length. */
+	stepIndex?: number;
 }
 
 /** POST body for `/api/next` — the server reconstructs an {@link EngineContext} from this. */

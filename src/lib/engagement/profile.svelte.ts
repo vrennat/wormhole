@@ -2,6 +2,8 @@ import { browser } from '$app/environment';
 import type { Article } from '$lib/wikipedia/types';
 import { FEED } from '$lib/feed/config';
 import { tokenize } from '$lib/feed/tokens';
+import type { TasteId } from '$lib/feed/taste';
+import { normalizeTaste } from '$lib/feed/taste';
 import { applySessionDecay } from './decay';
 
 const STORAGE_KEY = 'tangent:profile:v1';
@@ -9,8 +11,12 @@ const STORAGE_KEY = 'tangent:profile:v1';
 interface Persisted {
 	likedTitles: string[];
 	clickthroughs: string[];
+	branchedTitles: string[];
+	skippedTitles: string[];
 	engagedTitles: string[];
 	tokenWeights: Record<string, number>;
+	tokenAvoidWeights: Record<string, number>;
+	taste: TasteId;
 	dwellMsByTitle: Record<string, number>;
 	tokenDocFreq: Record<string, number>;
 	seenCount: number;
@@ -20,8 +26,12 @@ interface Persisted {
 const EMPTY: Persisted = {
 	likedTitles: [],
 	clickthroughs: [],
+	branchedTitles: [],
+	skippedTitles: [],
 	engagedTitles: [],
 	tokenWeights: {},
+	tokenAvoidWeights: {},
+	taste: 'balanced',
 	dwellMsByTitle: {},
 	tokenDocFreq: {},
 	seenCount: 0,
@@ -53,10 +63,14 @@ class EngagementProfile {
 	likedTitles = $state<string[]>([]);
 	clickthroughs = $state<string[]>([]);
 	tokenWeights = $state<Record<string, number>>({});
+	tokenAvoidWeights = $state<Record<string, number>>({});
 	tokenDocFreq = $state<Record<string, number>>({});
+	taste = $state<TasteId>('balanced');
 	seenCount = $state(0);
 
 	#engaged = new Set<string>();
+	#branched = new Set<string>();
+	#skipped = new Set<string>();
 	#dwellMs: Record<string, number> = {};
 	// Titles we've already counted in tokenDocFreq — dedupe across the session.
 	#seenForDfTitles = new Set<string>();
@@ -66,9 +80,13 @@ class EngagementProfile {
 		this.likedTitles = data.likedTitles;
 		this.clickthroughs = data.clickthroughs;
 		this.tokenWeights = data.tokenWeights;
+		this.tokenAvoidWeights = data.tokenAvoidWeights;
 		this.tokenDocFreq = data.tokenDocFreq;
+		this.taste = normalizeTaste(data.taste);
 		this.seenCount = data.seenCount;
 		this.#engaged = new Set(data.engagedTitles);
+		this.#branched = new Set(data.branchedTitles);
+		this.#skipped = new Set(data.skippedTitles);
 		this.#dwellMs = data.dwellMsByTitle;
 		this.#seenForDfTitles = new Set(data.seenForDfTitles);
 
@@ -78,6 +96,11 @@ class EngagementProfile {
 				sessionDecay: FEED.sessionDecay,
 				sessionDecayFloor: FEED.sessionDecayFloor,
 				tokenWeightCap: FEED.tokenWeightCap
+			});
+			this.tokenAvoidWeights = applySessionDecay(this.tokenAvoidWeights, {
+				sessionDecay: FEED.avoidSessionDecay,
+				sessionDecayFloor: FEED.sessionDecayFloor,
+				tokenWeightCap: FEED.avoidTokenWeightCap
 			});
 			sessionStorage.setItem(FEED.decayStorageKey, '1');
 			this.#save();
@@ -94,6 +117,7 @@ class EngagementProfile {
 			this.#bumpTokens(article, -FEED.likeTokenWeight);
 		} else {
 			this.likedTitles = [...this.likedTitles, article.title];
+			this.#clearSkip(article);
 			this.#bumpTokens(article, FEED.likeTokenWeight);
 		}
 		this.#save();
@@ -104,11 +128,41 @@ class EngagementProfile {
 	 * First clickthrough bumps the interest vector by `clickthroughTokenWeight`.
 	 */
 	recordClickthrough(article: Article): void {
+		const clearedSkip = this.#clearSkip(article);
 		if (!this.clickthroughs.includes(article.title)) {
 			this.clickthroughs = [...this.clickthroughs, article.title];
 			this.#bumpTokens(article, FEED.clickthroughTokenWeight);
 			this.#save();
+		} else if (clearedSkip) {
+			this.#save();
 		}
+	}
+
+	/** Record an explicit "more like this" branch intent. */
+	recordBranch(article: Article): void {
+		const clearedSkip = this.#clearSkip(article);
+		if (!this.#branched.has(article.title)) {
+			this.#branched.add(article.title);
+			this.#bumpTokens(article, FEED.branchTokenWeight);
+			this.#save();
+		} else if (clearedSkip) {
+			this.#save();
+		}
+	}
+
+	/** Record a quick pass with no read/like/branch. Weak and deduped by title. */
+	recordSkip(article: Article): void {
+		if (this.#hasPositiveSignal(article.title) || this.#skipped.has(article.title)) return;
+		this.#skipped.add(article.title);
+		this.#bumpAvoidTokens(article, FEED.skipTokenWeight);
+		this.#save();
+	}
+
+	setTaste(taste: TasteId): void {
+		const next = normalizeTaste(taste);
+		if (this.taste === next) return;
+		this.taste = next;
+		this.#save();
 	}
 
 	/**
@@ -136,6 +190,7 @@ class EngagementProfile {
 		this.#dwellMs[article.title] = next;
 		if (next >= FEED.dwellThresholdMs && !this.#engaged.has(article.title)) {
 			this.#engaged.add(article.title);
+			this.#clearSkip(article);
 			this.#bumpTokens(article, FEED.dwellTokenWeight);
 		}
 		this.#save();
@@ -145,9 +200,13 @@ class EngagementProfile {
 		this.likedTitles = [];
 		this.clickthroughs = [];
 		this.tokenWeights = {};
+		this.tokenAvoidWeights = {};
 		this.tokenDocFreq = {};
+		this.taste = 'balanced';
 		this.seenCount = 0;
 		this.#engaged = new Set();
+		this.#branched = new Set();
+		this.#skipped = new Set();
 		this.#dwellMs = {};
 		this.#seenForDfTitles = new Set();
 		// Remove the decay sentinel so the fresh profile gets decayed when the session restarts.
@@ -170,13 +229,47 @@ class EngagementProfile {
 		this.tokenWeights = next;
 	}
 
+	#bumpAvoidTokens(article: Article, delta: number): void {
+		const tokens = new Set(tokenize(`${article.title} ${article.description ?? ''}`));
+		const next = { ...this.tokenAvoidWeights };
+		for (const token of tokens) {
+			const value = (next[token] ?? 0) + delta;
+			if (value <= 0) {
+				delete next[token];
+			} else {
+				next[token] = Math.min(value, FEED.avoidTokenWeightCap);
+			}
+		}
+		this.tokenAvoidWeights = next;
+	}
+
+	#clearSkip(article: Article): boolean {
+		if (!this.#skipped.has(article.title)) return false;
+		this.#skipped.delete(article.title);
+		this.#bumpAvoidTokens(article, -FEED.skipTokenWeight);
+		return true;
+	}
+
+	#hasPositiveSignal(title: string): boolean {
+		return (
+			this.likedTitles.includes(title) ||
+			this.clickthroughs.includes(title) ||
+			this.#branched.has(title) ||
+			this.#engaged.has(title)
+		);
+	}
+
 	#save(): void {
 		if (!browser) return;
 		const data: Persisted = {
 			likedTitles: this.likedTitles,
 			clickthroughs: this.clickthroughs,
+			branchedTitles: [...this.#branched],
+			skippedTitles: [...this.#skipped],
 			engagedTitles: [...this.#engaged],
 			tokenWeights: this.tokenWeights,
+			tokenAvoidWeights: this.tokenAvoidWeights,
+			taste: this.taste,
 			dwellMsByTitle: this.#dwellMs,
 			tokenDocFreq: this.tokenDocFreq,
 			seenCount: this.seenCount,

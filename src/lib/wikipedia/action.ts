@@ -30,6 +30,8 @@ interface ParseResponse {
 
 /** How many usable lead links we want before falling back to the hybrid set. */
 const MIN_EXPLORE = 5;
+/** Enough candidates for top-K scoring plus a real surprise middle. */
+const TARGET_EXPLORE = 14;
 /** titles= batch limit for non-bot clients; also our candidate cap. */
 const MAX_CANDIDATES = 50;
 
@@ -204,15 +206,30 @@ async function fetchHybrid(title: string): Promise<Candidate[]> {
 
 /**
  * Primary candidate source for the feed: prominent, in-order lead-section links.
- * Falls back to the hybrid (outbound + related) set for stubs or parse misses, so
- * the rabbit hole never dead-ends.
+ * Tops up thinner lead pools with related pages so scoring has enough lateral,
+ * potentially more interesting options; falls back to the hybrid (outbound + related)
+ * set for stubs or parse misses, so the rabbit hole never dead-ends.
  */
 export async function fetchExploreCandidates(title: string): Promise<Candidate[]> {
 	const leadTitles = await fetchLeadLinkTitles(title);
 	const lead = (await enrichByTitles(leadTitles)).filter(
 		(c) => !c.isDisambiguation && c.title !== title
 	);
-	if (lead.length >= MIN_EXPLORE) return lead;
+	if (lead.length >= TARGET_EXPLORE) return lead;
+
+	if (lead.length >= MIN_EXPLORE) {
+		let related: Candidate[];
+		try {
+			related = await fetchRelated(title);
+		} catch {
+			return lead;
+		}
+		const have = new Set(lead.map((c) => c.title));
+		const extra = related
+			.filter((c) => c.title !== title && !have.has(c.title))
+			.map((c, i) => ({ ...c, position: lead.length + i }));
+		return [...lead, ...extra].slice(0, MAX_CANDIDATES);
+	}
 
 	const fallback = await fetchHybrid(title);
 	const have = new Set(lead.map((c) => c.title));

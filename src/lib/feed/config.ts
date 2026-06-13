@@ -10,6 +10,12 @@ export const FEED = {
 	base: 1,
 	/** Weight on relevance (overlap with the user's interest vector). Squashed via tanh. */
 	relevanceWeight: 2.5,
+	/** Weight on avoided tokens learned from quick skips / bounces. Squashed via tanh. */
+	avoidanceWeight: 1.6,
+	/** Weight on the user's explicit tangent flavor (technology, oddities, culture, etc.). */
+	tasteWeight: 1.15,
+	/** Small global boost for story-rich hooks: mysteries, firsts, rituals, failed ideas. */
+	intrigueWeight: 0.65,
 	/**
 	 * Weight on the intrinsic specificity signal. A pure position ranking climbs the
 	 * abstraction ladder — cold-start rabbit holes collapse into Entity / Language /
@@ -57,18 +63,46 @@ export const FEED = {
 	likeTokenWeight: 1,
 	/** Weight added when the user explicitly clicks through to read an article — stronger than passive dwell. */
 	clickthroughTokenWeight: 0.7,
+	/** Weight added when the user explicitly branches from an article. */
+	branchTokenWeight: 0.85,
 	/** Lighter weight for tokens from articles the user merely dwelled on. */
 	dwellTokenWeight: 0.2,
+	/** Weight added to the avoided-token vector when a card is quickly skipped. */
+	skipTokenWeight: 0.28,
 	/** Dwell milliseconds before an article counts as "engaged with". */
 	dwellThresholdMs: 4000,
+	/** Ignore tiny visibility blips when deciding whether a card was skipped. */
+	skipMinVisibleMs: 350,
+	/** Below this visible duration, no interaction is treated as a weak negative signal. */
+	skipThresholdMs: 1400,
 	/** Multiply all token weights by this at the start of each session so stale interests fade. */
 	sessionDecay: 0.85,
+	/** Avoidance memory decays faster than positive interest so skips stay reversible. */
+	avoidSessionDecay: 0.65,
 	/** Drop tokens below this floor when decaying — noise that decay brought down this far is useless. */
 	sessionDecayFloor: 0.05,
 	/** Single token weight ceiling; prevents one obsession from drowning everything else out. */
 	tokenWeightCap: 3,
+	/** Single avoided-token ceiling; keeps skips from permanently burying broad topics. */
+	avoidTokenWeightCap: 1.8,
+	/** Five-card pacing loop: continuity, continuity, taste, novelty, specificity. */
+	pacingPattern: ['close', 'close', 'taste', 'intrigue', 'specific'] as const,
+	/** Extra boost for the explicit taste slot. */
+	pacingTasteBoost: 1.25,
+	/** Extra boost for the novelty/hook slot. */
+	pacingIntrigueBoost: 1.5,
+	/** Extra boost for the vivid-specific story slot. */
+	pacingSpecificityBoost: 1.1,
 	/** Minimum score for a candidate to qualify for the surprise pool (excludes garbage at the bottom). */
 	surpriseFloor: 0.1,
+	/** Minimum hook score for a smart surprise. */
+	surpriseIntrigueFloor: 0.35,
+	/** Extra surprise-time weight for hooky lateral candidates. */
+	surpriseIntrigueBoost: 1.8,
+	/** Surprise softmax temperature; higher than normal because surprise should vary. */
+	surpriseTemperature: 0.85,
+	/** Cap smart-surprise candidates after sorting by surprise score. */
+	surpriseTopK: 10,
 	/**
 	 * Minimum usable mid-tier candidates (below top-K) for a surprise to fire.
 	 * Equivalent to requiring a total scored pool of roughly topK + this many —

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FeedCard } from '$lib/feed/types';
 	import { Star, CirclePlus, LoaderCircle, ArrowRight } from '@lucide/svelte';
+	import { FEED } from '$lib/feed/config';
 	import { profile } from '$lib/engagement/profile.svelte';
 	import ConnectionBreadcrumb from './ConnectionBreadcrumb.svelte';
 
@@ -24,12 +25,15 @@
 	const liked = $derived(profile.isLiked(article.title));
 
 	let branching = $state(false);
+	let interacted = false;
 	// Wikipedia thumbnails (especially body-scraped fallbacks) sometimes 404. The inset
 	// is decorative garnish, so a broken one collapses rather than showing a broken box.
 	let imageFailed = $state(false);
 
 	async function branch() {
 		if (branching) return;
+		interacted = true;
+		profile.recordBranch(article);
 		branching = true;
 		try {
 			await onBranch(card);
@@ -39,8 +43,14 @@
 	}
 
 	function read() {
+		interacted = true;
 		profile.recordClickthrough(article);
 		onRead(card);
+	}
+
+	function toggleLike() {
+		interacted = true;
+		profile.toggleLike(article);
 	}
 
 	// Tapping anywhere on the card (except buttons/links) opens the reader.
@@ -54,6 +64,7 @@
 	// Dwell tracking: accumulate time this card is at least half on screen.
 	let el = $state<HTMLElement | null>(null);
 	let visibleSince = 0;
+	let visibleTotalMs = 0;
 	// Fire onSeen once — the first time this card is actually scrolled into view.
 	let hasSignaledSeen = false;
 
@@ -61,7 +72,15 @@
 		if (!visibleSince) return;
 		const ms = performance.now() - visibleSince;
 		visibleSince = 0;
+		visibleTotalMs += ms;
 		if (ms > 500) profile.recordDwell(article, ms);
+		if (
+			visibleTotalMs >= FEED.skipMinVisibleMs &&
+			visibleTotalMs < FEED.skipThresholdMs &&
+			!interacted
+		) {
+			profile.recordSkip(article);
+		}
 	}
 
 	$effect(() => {
@@ -133,7 +152,7 @@
 		<div class="flex flex-wrap items-center gap-2 pt-1">
 			<button
 				type="button"
-				onclick={() => profile.toggleLike(article)}
+				onclick={toggleLike}
 				aria-pressed={liked}
 				aria-label={liked ? 'Unlike' : 'Like'}
 				class="group inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm

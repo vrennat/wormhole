@@ -21,10 +21,13 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
 function context(overrides: Partial<EngineContext> = {}): EngineContext {
 	return {
 		tokenWeights: {},
+		tokenAvoidWeights: {},
 		tokenDocFreq: {},
+		taste: 'balanced',
 		recentTokens: new Set(),
 		seenTitles: new Set(),
 		noSurprise: false,
+		stepIndex: 0,
 		rng: () => 0.5,
 		...overrides
 	};
@@ -74,6 +77,13 @@ describe('scoreCandidate', () => {
 			expect(fresh).toBeGreaterThan(monotonous);
 		});
 
+		it('penalizes candidates matching skipped tokens', () => {
+			const ctx = context({ tokenAvoidWeights: { water: 2, channel: 2 } });
+			const skippedTopic = scoreCandidate(candidate(), ctx);
+			const fresh = scoreCandidate(candidate({ title: 'Volcano', description: 'erupting mountain' }), ctx);
+			expect(fresh).toBeGreaterThan(skippedTopic);
+		});
+
 		it('slightly prefers real links over related fallbacks', () => {
 			const link = scoreCandidate(candidate({ relation: 'link' }), context());
 			const related = scoreCandidate(candidate({ relation: 'related' }), context());
@@ -84,6 +94,31 @@ describe('scoreCandidate', () => {
 			const lead = scoreCandidate(candidate({ position: 0 }), context());
 			const deep = scoreCandidate(candidate({ position: 40 }), context());
 			expect(lead).toBeGreaterThan(deep);
+		});
+
+		it('boosts candidates that match the selected tangent flavor', () => {
+			const tech = candidate({
+				title: 'Transistor',
+				description: 'semiconductor device',
+				categories: ['Category:Electronics']
+			});
+			const culture = candidate({
+				title: 'Supper club',
+				description: 'traditional dining establishment',
+				categories: ['Category:Food culture']
+			});
+			const ctx = context({ taste: 'technology' });
+
+			expect(scoreCandidate(tech, ctx)).toBeGreaterThan(scoreCandidate(culture, ctx));
+		});
+
+		it('gives story-rich oddities a smaller global curiosity boost', () => {
+			const oddity = candidate({ title: 'Wow! signal', description: 'unexplained radio signal' });
+			const ordinary = candidate({ title: 'Radio signal', description: 'electromagnetic wave' });
+
+			expect(scoreCandidate(oddity, context())).toBeGreaterThan(
+				scoreCandidate(ordinary, context())
+			);
 		});
 	});
 
@@ -152,38 +187,100 @@ describe('selectNext', () => {
 			const pool = [candidate({ title: 'Mercury', isDisambiguation: true }), candidate()];
 			expect(selectNext(pool, ctx)?.candidate.isDisambiguation).toBe(false);
 		});
+
+		it('uses tangent flavor as a soft steering signal', () => {
+			const ctx = context({ taste: 'oddities', rng: seq([0.99, 0]) });
+			const pool = [
+				candidate({ title: 'Water channel', description: 'engineered conduit' }),
+				candidate({ title: 'Urban legend', description: 'modern folklore story' })
+			];
+
+			expect(selectNext(pool, ctx)?.candidate.title).toBe('Urban legend');
+		});
+
+		it('uses the taste pacing slot to lean harder into explicit flavor', () => {
+			const ctx = context({ taste: 'technology', stepIndex: 2, rng: seq([0.99, 0]) });
+			const pool = [
+				candidate({ title: 'Canal', description: 'water channel', position: 0 }),
+				candidate({
+					title: 'Packet switching',
+					description: 'computer networking technology',
+					categories: ['Category:Internet technology'],
+					position: 12
+				})
+			];
+
+			expect(selectNext(pool, ctx)?.candidate.title).toBe('Packet switching');
+		});
+
+		it('uses the intrigue pacing slot to pick a hooky lateral', () => {
+			const ctx = context({ stepIndex: 3, rng: seq([0.99, 0]) });
+			const pool = [
+				candidate({ title: 'Canal', description: 'water channel', position: 0 }),
+				candidate({ title: 'Lost city', description: 'abandoned ancient settlement', position: 12 })
+			];
+
+			expect(selectNext(pool, ctx)?.candidate.title).toBe('Lost city');
+		});
+
+		it('uses the specificity pacing slot to prefer vivid concrete articles', () => {
+			const ctx = context({ stepIndex: 4, rng: seq([0.99, 0]) });
+			const pool = [
+				candidate({ title: 'Entity', description: 'Something that exists', position: 0 }),
+				candidate({ title: 'New Orleans', description: 'city founded in 1718', position: 10 })
+			];
+
+			expect(selectNext(pool, ctx)?.candidate.title).toBe('New Orleans');
+		});
 	});
 
 	describe('surprise mode', () => {
-		// Build a pool large enough that ranked candidates beyond topK exist,
-		// so the surprise pool (>= surpriseMinPool) is eligible.
-		function bigPool(n: number): Candidate[] {
+		function neutralPool(n: number): Candidate[] {
 			return Array.from({ length: n }, (_, i) =>
-				candidate({ title: `Article${i}`, description: 'neutral topic', thumbnail: null })
+				candidate({
+					title: `Article${i}`,
+					description: 'neutral topic',
+					thumbnail: null,
+					position: 0
+				})
 			);
 		}
 
-		it('fires when RNG falls under the epsilon and pool is large enough', () => {
-			// Need surpriseMinPool (3) candidates below topK=8. With 12 candidates
-			// scored, 4 fall below topK — sufficient.
-			// rng[0]=0 triggers surprise; rng[1]=0 picks the first surprise-pool entry.
-			const pool = bigPool(12);
+		function hookyTail(n: number): Candidate[] {
+			return Array.from({ length: n }, (_, i) =>
+				candidate({
+					title: `Lost article ${i}`,
+					description: 'unsolved mystery and abandoned experimental project',
+					thumbnail: null,
+					position: 100 + i
+				})
+			);
+		}
+
+		it('fires when RNG falls under the epsilon and the hooky surprise pool is large enough', () => {
+			const pool = [...neutralPool(FEED.topK), ...hookyTail(FEED.surpriseMinPool + 1)];
 			const ctx = context({ rng: seq([0, 0]) });
 			const result = selectNext(pool, ctx);
 			expect(result?.surprised).toBe(true);
+			expect(result?.candidate.title).toMatch(/^Lost article/);
 		});
 
-		it('falls back to normal pick when surprise pool is too shallow (< surpriseMinPool)', () => {
-			// With only 9 candidates total, at most 1 is below topK=8 — pool too shallow.
-			const pool = bigPool(9);
+		it('falls back to normal pick when the hooky surprise pool is too shallow', () => {
+			const pool = [...neutralPool(FEED.topK), ...hookyTail(FEED.surpriseMinPool - 1)];
 			const ctx = context({ rng: seq([0, 0]) });
 			const result = selectNext(pool, ctx);
-			// Falls through to normal softmax — not a surprise.
+			expect(result?.surprised).toBe(false);
+		});
+
+		it('falls back to normal pick when the middle has no strong hooks', () => {
+			const pool = neutralPool(FEED.topK + FEED.surpriseMinPool + 1);
+			const ctx = context({ rng: seq([0, 0]) });
+			const result = selectNext(pool, ctx);
 			expect(result?.surprised).toBe(false);
 		});
 
 		it('never surprises when noSurprise is true, even with rng forcing epsilon', () => {
-			const pool = bigPool(20);
+			const pool = [...neutralPool(FEED.topK), ...hookyTail(FEED.surpriseMinPool + 1)];
 			const ctx = context({ noSurprise: true, rng: seq([0, 0]) });
 			const result = selectNext(pool, ctx);
 			expect(result?.surprised).toBe(false);
@@ -192,11 +289,12 @@ describe('selectNext', () => {
 		it('excludes political candidates from the surprise pool', () => {
 			// Build a large pool; mix in a political candidate near the bottom of scores.
 			// With rng always triggering surprise, it should never be the pick.
-			const normalCandidates = bigPool(20);
+			const normalCandidates = [...neutralPool(FEED.topK), ...hookyTail(FEED.surpriseMinPool + 1)];
 			const political = candidate({
 				title: 'United States presidential election',
-				description: 'election politics',
-				categories: ['Category:Elections']
+				description: 'unsolved election politics scandal',
+				categories: ['Category:Elections'],
+				position: 100
 			});
 			const pool = [...normalCandidates, political];
 			// Run many selections with rng always firing surprise and picking the first entry.

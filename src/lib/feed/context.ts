@@ -1,4 +1,5 @@
 import type { EngineContext, InterestPayload, SessionPayload } from './types';
+import { normalizeTaste } from './taste';
 
 /**
  * Rebuild a pure {@link EngineContext} from the wire payload `/api/next` receives.
@@ -18,10 +19,13 @@ export function buildEngineContext(
 
 	return {
 		tokenWeights: interest.tokenWeights ?? {},
+		tokenAvoidWeights: interest.tokenAvoidWeights ?? {},
 		tokenDocFreq: interest.tokenDocFreq ?? {},
+		taste: normalizeTaste(interest.taste),
 		recentTokens: new Set(session.recentTokens ?? []),
 		seenTitles,
 		noSurprise: session.noSurprise ?? false,
+		stepIndex: session.stepIndex ?? seenTitles.size,
 		rng
 	};
 }

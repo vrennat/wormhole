@@ -1,8 +1,13 @@
 import type { Candidate } from '$lib/wikipedia/types';
 import type { EngineContext, Selection } from './types';
 import { FEED } from './config';
-import { scoreCandidate } from './score';
+import { scoreCandidate, specificity } from './score';
 import { isPolitical } from './politics';
+import { intrigue, tasteAffinity } from './taste';
+
+type PaceSlot = (typeof FEED.pacingPattern)[number];
+type Scored = { candidate: Candidate; score: number };
+type Ranked = Scored & { selectionScore: number };
 
 /** Candidates we're allowed to land on at all. */
 function eligible(candidates: Candidate[], ctx: EngineContext): Candidate[] {
@@ -20,27 +25,63 @@ function weightedIndex(weights: number[], rng: () => number): number {
 	return weights.length - 1;
 }
 
-/** Normal softmax pick over the top-K scored candidates. */
-function pickFromTopK(
-	scored: { candidate: Candidate; score: number }[],
-	rng: () => number
+/** Softmax pick over ranked candidates. */
+function pickWeighted(
+	ranked: Ranked[],
+	rng: () => number,
+	temperature: number = FEED.temperature,
+	surprised = false
 ): Selection {
-	const top = scored[0].score;
-	const weights = scored.map((s) => Math.exp((s.score - top) / FEED.temperature));
+	const top = ranked[0].selectionScore;
+	const weights = ranked.map((s) => Math.exp((s.selectionScore - top) / temperature));
 	const idx = weightedIndex(weights, rng);
-	return { candidate: scored[idx].candidate, surprised: false };
+	return { candidate: ranked[idx].candidate, surprised };
+}
+
+function paceSlot(ctx: EngineContext): PaceSlot {
+	return FEED.pacingPattern[ctx.stepIndex % FEED.pacingPattern.length];
+}
+
+function pacedScore(scored: Scored, ctx: EngineContext, slot: PaceSlot): number {
+	switch (slot) {
+		case 'taste':
+			return scored.score + FEED.pacingTasteBoost * tasteAffinity(scored.candidate, ctx.taste);
+		case 'intrigue':
+			return scored.score + FEED.pacingIntrigueBoost * intrigue(scored.candidate);
+		case 'specific':
+			return scored.score + FEED.pacingSpecificityBoost * Math.max(0, specificity(scored.candidate));
+		case 'close':
+			return scored.score;
+	}
+}
+
+function rankedForSlot(scored: Scored[], ctx: EngineContext): Ranked[] {
+	const slot = paceSlot(ctx);
+	return scored
+		.map((s) => ({ ...s, selectionScore: pacedScore(s, ctx, slot) }))
+		.sort((a, b) => b.selectionScore - a.selectionScore);
+}
+
+function surpriseRanked(scored: Scored[], excludedTitles: Set<string>): Ranked[] {
+	return scored
+		.filter((s) => !excludedTitles.has(s.candidate.title))
+		.map((s) => ({
+			...s,
+			selectionScore: s.score + FEED.surpriseIntrigueBoost * intrigue(s.candidate)
+		}))
+		.sort((a, b) => b.selectionScore - a.selectionScore)
+		.slice(0, FEED.surpriseTopK);
 }
 
 /**
  * Choose the next article from a candidate pool.
  *
  * Two modes:
- *  - Surprise (probability `surpriseEpsilon`, when `!ctx.noSurprise`): pick uniformly
- *    from the scored middle — candidates ranked below topK, excluding political
- *    content and sub-floor scores. Falls through to normal mode when the surprise pool
- *    is too shallow (< surpriseMinPool), preventing low-quality detours.
- *  - Default: score everyone, keep the top-K, then softmax-weighted-random among
- *    them so the feed favors strong matches without being robotically predictable.
+ *  - Surprise (probability `surpriseEpsilon`, when `!ctx.noSurprise`): pick from
+ *    candidates outside the paced top-K that still have enough base score and a
+ *    strong hook/intrigue signal. Falls through when that pool is too shallow.
+ *  - Default: score everyone, apply the current pacing slot (close, taste,
+ *    intrigue, specific), keep the top-K, then softmax-weighted-random among them.
  *
  * Returns null only when nothing is eligible (true dead end).
  */
@@ -52,26 +93,31 @@ export function selectNext(candidates: Candidate[], ctx: EngineContext): Selecti
 		.map((candidate) => ({ candidate, score: scoreCandidate(candidate, ctx) }))
 		.sort((a, b) => b.score - a.score);
 
-	const topKScored = scored.slice(0, FEED.topK);
+	const ranked = rankedForSlot(scored, ctx);
+	const topKScored = ranked.slice(0, FEED.topK);
 
 	if (!ctx.noSurprise && ctx.rng() < FEED.surpriseEpsilon) {
-		// Surprise pool: candidates ranked below the top-K, excluding political and
-		// sub-floor scores. We want genuine serendipity, not garbage.
-		const surprisePool = scored
-			.slice(FEED.topK)
+		// Smart surprise: look outside the normal top-K for candidates with a strong
+		// hook, enough base quality, and low political risk. Surprise should read as
+		// "wait, what?" rather than an unscored random page from the middle.
+		const excluded = new Set(topKScored.map((s) => s.candidate.title));
+		const surprisePool = surpriseRanked(scored, excluded)
 			.filter((s) => {
 				const blob = `${s.candidate.title} ${s.candidate.description ?? ''} ${(s.candidate.categories ?? []).join(' ')}`;
-				return s.score >= FEED.surpriseFloor && !isPolitical(blob);
+				return (
+					s.score >= FEED.surpriseFloor &&
+					intrigue(s.candidate) >= FEED.surpriseIntrigueFloor &&
+					!isPolitical(blob)
+				);
 			});
 
 		// If the pool is too shallow, fall through to normal picks — a dud surprise is worse than none.
 		if (surprisePool.length >= FEED.surpriseMinPool) {
-			const idx = Math.floor(ctx.rng() * surprisePool.length);
-			return { candidate: surprisePool[idx].candidate, surprised: true };
+			return pickWeighted(surprisePool, ctx.rng, FEED.surpriseTemperature, true);
 		}
 	}
 
 	// Normal path: softmax over top-K.
 	if (topKScored.length === 0) return null;
-	return pickFromTopK(topKScored, ctx.rng);
+	return pickWeighted(topKScored, ctx.rng);
 }

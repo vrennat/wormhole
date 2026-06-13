@@ -259,6 +259,12 @@ class FeedState {
 		void this.#refill();
 	}
 
+	/** User changed explicit taste steering; discard stale prefetched picks. */
+	retune(): void {
+		this.#buffer = [];
+		if (this.status === 'ready') void this.#refill();
+	}
+
 	#refill(): Promise<void> {
 		return (async () => {
 			while (this.#buffer.length < PREFETCH_TARGET && this.status !== 'exhausted') {
@@ -359,10 +365,13 @@ class FeedState {
 
 		return {
 			tokenWeights: profile.tokenWeights,
+			tokenAvoidWeights: profile.tokenAvoidWeights,
 			tokenDocFreq: profile.tokenDocFreq,
+			taste: profile.taste,
 			recentTokens,
 			seenTitles,
 			noSurprise: opts.noSurprise ?? false,
+			stepIndex: all.length,
 			rng: Math.random
 		};
 	}

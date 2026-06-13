@@ -2,6 +2,7 @@ import type { Candidate } from '$lib/wikipedia/types';
 import type { EngineContext } from './types';
 import { FEED } from './config';
 import { isPolitical } from './politics';
+import { intrigue, tasteAffinity } from './taste';
 import { tokenize } from './tokens';
 
 /** DF-discounted token weight — w / (1 + ln(1 + df)). Same form as TF-IDF's IDF. */
@@ -68,11 +69,14 @@ export function scoreCandidate(candidate: Candidate, ctx: EngineContext): number
 	const tokens = tokenize(`${candidate.title} ${candidate.description ?? ''}`);
 
 	let relevance = 0;
+	let avoidance = 0;
 	let overlap = 0;
 	for (const token of tokens) {
 		const weight = ctx.tokenWeights[token] ?? 0;
+		const avoidWeight = ctx.tokenAvoidWeights[token] ?? 0;
 		const df = ctx.tokenDocFreq[token] ?? 0;
 		relevance += dfWeight(weight, df);
+		avoidance += dfWeight(avoidWeight, df);
 		if (ctx.recentTokens.has(token)) overlap += 1;
 	}
 
@@ -80,9 +84,12 @@ export function scoreCandidate(candidate: Candidate, ctx: EngineContext): number
 	// tanh(x/2) softens the squash: one matched token gives ~0.46 of max instead of 0.76
 	// so moderate interest doesn't immediately dominate the score.
 	score += FEED.relevanceWeight * Math.tanh(relevance / 2);
+	score -= FEED.avoidanceWeight * Math.tanh(avoidance / 2);
 	score += overlap * FEED.varietyPenalty;
 	if (candidate.thumbnail) score += FEED.imageBonus;
 	if (candidate.relation === 'related') score += FEED.relatedPenalty;
+	score += FEED.tasteWeight * tasteAffinity(candidate, ctx.taste);
+	score += FEED.intrigueWeight * intrigue(candidate);
 
 	// Pull toward vivid specifics, away from the abstraction sinks a position-only
 	// ranking climbs into (Entity / Language / Science). Tapered by relevance (1/(1+r)):
