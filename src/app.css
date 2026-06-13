@@ -258,6 +258,17 @@ body::before {
 	height: auto;
 	border-radius: 0.5rem;
 }
+/* Line drawings (math/science diagrams, schematics) are authored as transparent SVGs
+   with dark linework for Wikipedia's white page — on Nightstand's dark surface that
+   ink vanishes. Wikipedia tags such files `data-file-type="drawing"` (photos are
+   "bitmap"), a signal that survives sanitization, so we render only those on a warm
+   "paper" plate that restores their native legibility. Photos are untouched.
+   Known gap: dark-on-transparent PNGs tagged "bitmap" (rare in article bodies) still
+   blend in; a white-on-transparent drawing (near-nonexistent on WP) would invert. */
+.wiki-content img[data-file-type='drawing'] {
+	background: #faf6ec;
+	padding: 0.7rem;
+}
 /* Center thumbnails in the reading column instead of letting them float left/right.
    Parsoid floats figures via mw-halign-* classes; we override those (see below) so
    every figure becomes a centered block. Capped at ~30rem rather than the full column
@@ -294,6 +305,17 @@ body::before {
 	width: fit-content !important;
 	max-width: 100% !important;
 	margin-inline: auto;
+}
+/* Default-size inline files (`[[File:…]]` with no thumb frame) arrive as
+   <span class="mw-default-size"><a><img></a></span> sitting inline in a <p>, so they
+   pin left instead of centering like figures/thumbs. MediaWiki only stamps
+   `mw-default-size` on standalone placements (inline icons carry explicit sizes), so
+   forcing this span to a centered block matches the figure treatment without
+   disturbing in-text imagery. text-align (not margin:auto) since the <a><img> is inline. */
+.wiki-content .mw-default-size {
+	display: block;
+	margin: 1.5em auto;
+	text-align: center;
 }
 .wiki-content figcaption,
 .wiki-content .thumbcaption {
