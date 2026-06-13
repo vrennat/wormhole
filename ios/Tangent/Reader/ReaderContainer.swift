@@ -1,35 +1,26 @@
 import SwiftUI
 
-/// The in-app reader surface: one article at a time. Tapping a Wikipedia link inside an
-/// article dives into a new feed card (`onDive`) rather than deepening a reader stack —
-/// so the feed itself stays the record of the rabbit hole, matching the web reader. Other
-/// links open in a Safari sheet; content images open the full-screen image viewer.
-///
-/// (A single-level NavigationStack still wraps the reader to carry the title bar + Done.)
+/// The in-app reader surface. From the feed, tapping a Wikipedia link inside an article
+/// dives into a new feed card (`onDive`) rather than deepening a stack — so the feed
+/// itself stays the record of the rabbit hole, matching the web reader. On surfaces with
+/// no feed (LikedView), `onDive` is omitted and links navigate in place via the
+/// NavigationStack (back-swipe to return). Other links open in a Safari sheet; content
+/// images open the full-screen image viewer.
 struct ReaderContainer: View {
 	let rootTitle: String
-	/// Dive into an in-article link — the feed closes the reader and drops the card.
-	var onDive: (String) -> Void
+	/// Feed surfaces handle a dive themselves (close the reader, drop a card). When nil,
+	/// the reader navigates to the linked article in place.
+	var onDive: ((String) -> Void)? = nil
 	var onClose: () -> Void
 
+	@State private var path: [String] = []
 	@State private var external: ExternalLink?
 	@State private var lightboxImage: LightboxImage?
 
 	var body: some View {
-		NavigationStack {
-			ArticleReaderView(
-				title: rootTitle,
-				onDive: onDive,
-				onExternal: { external = ExternalLink(url: $0) },
-				onImage: { lightboxImage = $0 }
-			)
-			.toolbarBackground(Theme.surface, for: .navigationBar)
-			.toolbarBackground(.visible, for: .navigationBar)
-			.toolbar {
-				ToolbarItem(placement: .topBarTrailing) {
-					Button("Done", action: onClose).foregroundStyle(Theme.accent)
-				}
-			}
+		NavigationStack(path: $path) {
+			reader(rootTitle)
+				.navigationDestination(for: String.self) { reader($0) }
 		}
 		.tint(Theme.accent)
 		.sheet(item: $external) { link in
@@ -37,6 +28,29 @@ struct ReaderContainer: View {
 		}
 		.fullScreenCover(item: $lightboxImage) { image in
 			ImageViewer(image: image) { lightboxImage = nil }
+		}
+	}
+
+	private func reader(_ title: String) -> some View {
+		ArticleReaderView(
+			title: title,
+			onDive: { followed in
+				// Feed: delegate (close reader, drop a card). No feed: navigate in place.
+				if let onDive {
+					onDive(followed)
+				} else {
+					path.append(followed)
+				}
+			},
+			onExternal: { external = ExternalLink(url: $0) },
+			onImage: { lightboxImage = $0 }
+		)
+		.toolbarBackground(Theme.surface, for: .navigationBar)
+		.toolbarBackground(.visible, for: .navigationBar)
+		.toolbar {
+			ToolbarItem(placement: .topBarTrailing) {
+				Button("Done", action: onClose).foregroundStyle(Theme.accent)
+			}
 		}
 	}
 }

@@ -34,20 +34,9 @@ struct LikedView: View {
 		}
 		.tint(Theme.accent)
 		.fullScreenCover(item: $reading) { item in
-			ReaderContainer(
-				rootTitle: item.title,
-				onDive: { title in
-					// No feed on this surface — a dive navigates the reader to the linked
-					// article (re-presents), and records the read like a clickthrough.
-					reading = ReaderTitle(title: title)
-					Task {
-						if let article = try? await APIClient.shared.card(title: title) {
-							profile.recordClickthrough(article)
-						}
-					}
-				},
-				onClose: { reading = nil }
-			)
+			// No feed on this surface, so `onDive` is omitted — links navigate in place
+			// inside the reader's NavigationStack (back-swipe to return).
+			ReaderContainer(rootTitle: item.title, onClose: { reading = nil })
 		}
 	}
 
